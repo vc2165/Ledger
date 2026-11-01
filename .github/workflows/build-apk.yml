@@ -55,10 +55,18 @@ jobs:
         continue-on-error: true
         run: |
           node make-icons.mjs
-          npx capacitor-assets generate --android --iconBackgroundColor '#1f5fd6' --iconBackgroundColorDark '#1f5fd6' --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#ffffff'
+          npx capacitor-assets generate --android --iconBackgroundColor '#17614a' --iconBackgroundColorDark '#17614a' --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#ffffff'
 
-      - name: Set version
+      - name: Notification icon and version
         run: |
+          cat > android/app/src/main/res/drawable/ic_stat_ledger.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp" android:height="24dp"
+              android:viewportWidth="24" android:viewportHeight="24">
+              <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+                  android:pathData="M6,3h12a1,1 0,0 1,1 1v17l-2.3,-1.4 -2.3,1.4 -2.4,-1.4 -2.4,1.4 -2.3,-1.4L5,21V4a1,1 0,0 1,1 -1zM8,7v2h8V7H8zM8,11v2h8v-2H8zM8,15v2h5v-2H8z"/>
+          </vector>
+          EOF
           sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
           grep -n "versionCode\|versionName" android/app/build.gradle
 
