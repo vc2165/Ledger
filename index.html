@@ -175,11 +175,10 @@ h4{font-size:14px;font-weight:600;margin:18px 0 2px}
 .sh .left{margin-left:-8px;margin-right:0}
 
 /* add screen */
-.amount{font-size:46px;font-weight:500;letter-spacing:-.02em;text-align:center;padding:10px 0 2px;min-height:76px}
-.amount .cur{color:var(--faint);margin-right:2px;font-weight:400}
-.amount .ph{color:var(--rule2)}
-.amount .caret{display:inline-block;width:2px;height:40px;background:var(--green);vertical-align:-6px;margin-left:2px;animation:blink 1s steps(2) infinite}
-@keyframes blink{50%{opacity:0}}
+.amount{display:flex;align-items:baseline;justify-content:center;gap:4px;padding:8px 0 4px;margin:0}
+.amount .cur{font-size:36px;color:var(--faint)}
+.amount input{border:0;padding:0;width:auto;max-width:260px;font-size:46px;font-weight:500;letter-spacing:-.02em;text-align:left;font-feature-settings:'tnum';background:none}
+.amount input::placeholder{color:var(--rule2)}
 .desc{border:0;border-bottom:1px solid var(--rule2);border-radius:0;padding:10px 2px;font-size:16px;text-align:center}
 .desc:focus{border-bottom-color:var(--green)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -189,9 +188,6 @@ h4{font-size:14px;font-weight:600;margin:18px 0 2px}
 .chip.sug .num{color:var(--graphite)}
 .more-t{display:flex;justify-content:space-between;align-items:center;padding:12px 0 2px;color:var(--graphite);font-size:14px;cursor:pointer;border:0;background:none;width:100%}
 .more-t b{color:var(--green);font-weight:500}
-.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px}
-.key{height:52px;border:0;border-radius:12px;background:var(--wash);font-size:22px;font-weight:500;cursor:pointer}
-.key:active{background:var(--rule)}
 .seg{display:flex;border:1px solid var(--rule2);border-radius:10px;overflow:hidden}
 .seg button{flex:1;border:0;background:var(--paper);padding:9px 0;font-size:13.5px;cursor:pointer;border-left:1px solid var(--rule2)}
 .seg button:first-child{border-left:0}
@@ -350,9 +346,13 @@ function migrate(){
   D.entries=D.entries||[];D.months=D.months||{};D.alias=D.alias||{};D.plan=D.plan||DEFAULT_DATA().plan;
   D.budgets=Object.assign({recurring:0,delivery:0,oneoff:0},D.budgets||{});
   if(!D.cats)D.cats=defaultCats();
-  if(!D.cats.other)D.cats.other={name:'Other',bucket:'recurring',color:'#8b9096',kw:[]};
+  if(!D.cats.other)D.cats.other={name:'Other',color:'#8b9096',kw:[]};
   D.entries.forEach(e=>{if(!D.cats[e.cat])e.cat=resolve(e.cat)});
-  D.ver=2;
+  if((D.ver||1)<3){ // v3: type moves from categories to individual expenses (only when set)
+    D.entries.forEach(e=>{if(!e.bucket){const b=(D.cats[e.cat]||{}).bucket;if(b&&b!=='recurring')e.bucket=b}});
+  }
+  Object.values(D.cats).forEach(c=>delete c.bucket);
+  D.ver=3;
 }
 let S={lock:false,remind:{on:false,hour:21,minute:30}};
 try{const s=JSON.parse(localStorage.getItem(SETTINGS)||'{}');Object.assign(S,s,{remind:Object.assign({},S.remind,s.remind||{})})}catch(e){}
@@ -369,7 +369,7 @@ function autoCat(desc){
 }
 const cat=id=>D.cats[resolve(id)];
 const catName=id=>cat(id).name;
-const bucketOf=e=>e.bucket||cat(e.cat).bucket;
+const bucketOf=e=>e.bucket||'recurring';
 const inMonth=k=>D.entries.filter(e=>monthKey(e.date)===k);
 const monthsWithData=()=>[...new Set(D.entries.map(e=>monthKey(e.date)))].sort();
 const incomeFor=k=>D.months[k]||{salary:D.plan.salary,saves:D.plan.saves};
@@ -398,7 +398,7 @@ function closeAll(){const n=stack.length+(dlg?1:0);if(dlg){const d=dlg;dlg=null;
 addEventListener('popstate',()=>{if(skipPop){skipPop--;return}if(dlg){const d=dlg;dlg=null;$('#dialog').classList.remove('open');d(null);return}if(stack.length){stack.pop();stack.length?renderTop():hideOverlay()}});
 $('#scrim').onclick=()=>closeAll();
 let drag=null;
-sheetEl.addEventListener('touchstart',e=>{drag=sheetEl.scrollTop<=0&&!e.target.closest('.keypad,.chips')?{y:e.touches[0].clientY,dy:0,on:false}:null},{passive:true});
+sheetEl.addEventListener('touchstart',e=>{drag=sheetEl.scrollTop<=0&&!e.target.closest('.chips')?{y:e.touches[0].clientY,dy:0,on:false}:null},{passive:true});
 sheetEl.addEventListener('touchmove',e=>{if(!drag)return;const dy=e.touches[0].clientY-drag.y;if(!drag.on){if(dy>10&&!['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName))drag.on=true;else if(Math.abs(dy)>10){drag=null;return}}if(drag.on){e.preventDefault();drag.dy=Math.max(0,dy);sheetEl.style.transition='none';sheetEl.style.transform=`translateY(${drag.dy}px)`}},{passive:false});
 sheetEl.addEventListener('touchend',()=>{if(!drag)return;const d=drag;drag=null;sheetEl.style.transition='';sheetEl.style.transform='';if(d.on&&d.dy>110)closeAll()});
 document.addEventListener('focusin',e=>{if(e.target.matches('input,textarea,select')&&sheetEl.contains(e.target))setTimeout(()=>e.target.scrollIntoView({block:'center',behavior:'smooth'}),300)});
@@ -479,7 +479,7 @@ function notes(k,st){
   return out.length?`<div class="notes">${out.map(t=>`<p>${t}</p>`).join('')}</div>`:'';
 }
 function entryRow(e){
-  const c=cat(e.cat),b=bucketOf(e),def=c.bucket;
+  const c=cat(e.cat),b=bucketOf(e),def='recurring';
   return `<div class="ent" data-id="${esc(e.id)}"><div class="bg">Delete</div><div class="fg"><div class="d"><div class="t">${esc(e.desc)}</div><div class="c"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}${b!==def?` <span class="tag">${BUCKETS[b]}</span>`:''}</div></div><div class="a num">${inr(e.amount,1)}</div></div></div>`;
 }
 function renderLog(){
@@ -531,7 +531,6 @@ function entryView(id,keep){
   const isNew=!id,e=id?D.entries.find(x=>x.id===id):null;
   const st={amt:e?String(e.amount):'',desc:e?(e.desc==='(unlabelled)'?'':e.desc):'',cat:e?resolve(e.cat):null,catTouched:!!e,bucket:e&&e.bucket||null,
     date:e?e.date:(keep||(view.month===thisMonth()?today():`${view.month}-01`)),more:false,allCats:false};
-  const fmtAmt=()=>{if(!st.amt)return '<span class="ph">0</span>';const [i,f]=st.amt.split('.');return (i?(+i).toLocaleString('en-IN'):'0')+(f!==undefined?'.'+f:'')};
   const dateLabel=()=>st.date===today()?'Today':toDate(st.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:st.date.slice(0,4)===today().slice(0,4)?undefined:'numeric'});
   const catChips=()=>{
     const u=usage(),ids=Object.keys(D.cats).sort((a,b)=>(u[b]||0)-(u[a]||0)||D.cats[a].name.localeCompare(D.cats[b].name));
@@ -539,48 +538,46 @@ function entryView(id,keep){
     return show.map(c=>`<button type="button" class="chip ${c===st.cat?'on':''}" data-c="${c}"><span class="dot" style="background:${D.cats[c].color}"></span>${esc(D.cats[c].name)}</button>`).join('')+(ids.length>8?`<button type="button" class="chip" data-all="1">${st.allCats?'Fewer':'All categories'}</button>`:'');
   };
   const html=()=>{
-    const def=st.cat?D.cats[st.cat].bucket:null;
     return `<div class="sh"><button class="ibtn left" id="cls" aria-label="Close">${ICONS.x}</button><h2>${isNew?'New expense':'Edit expense'}</h2>${isNew?'<span style="width:40px"></span>':`<button class="ibtn" id="del" aria-label="Delete" style="color:var(--red)">${ICONS.del}</button>`}</div>
-    <div class="amount num"><span class="cur">₹</span><span id="amtV">${fmtAmt()}</span><span class="caret"></span></div>
+    <label class="amount"><span class="cur">₹</span><input id="amt" inputmode="decimal" placeholder="0" value="${esc(st.amt)}" size="${Math.max(1,(st.amt||'0').length)}" autocomplete="off" enterkeyhint="next" aria-label="Amount"></label>
     <input class="desc" id="desc" placeholder="What was it for?" value="${esc(st.desc)}" autocomplete="off" enterkeyhint="done">
     <div class="chips" id="sugg"></div>
     <div class="lbl" style="margin-top:14px">Category</div>
     <div class="chips" id="cats" style="margin-top:0">${catChips()}</div>
-    <button type="button" class="more-t" id="moreT"><span>${esc(dateLabel())}${st.bucket?`, counts as ${BUCKETS[st.bucket].toLowerCase()}`:''}</span><b>${st.more?'Hide options':'More options'}</b></button>
+    <button type="button" class="more-t" id="moreT"><span>${esc(dateLabel())}${st.bucket?`, ${BUCKETS[st.bucket].toLowerCase()}`:''}</span><b>${st.more?'Hide options':'More options'}</b></button>
     <div id="moreB" ${st.more?'':'hidden'}>
       <div class="lbl">Date</div><input type="date" id="date" value="${esc(st.date)}">
-      <div class="lbl">Counts as</div>
-      <div class="seg" id="seg"><button type="button" data-b="" class="${!st.bucket?'on':''}">Category default${def?` (${BUCKETS[def]})`:''}</button><button type="button" data-b="oneoff" class="${st.bucket==='oneoff'?'on':''}">One-off</button></div>
-      <div class="chips" style="margin-top:8px"><button type="button" class="chip ${st.bucket==='fixed'?'on':''}" data-b2="fixed">Fixed</button><button type="button" class="chip ${st.bucket==='recurring'?'on':''}" data-b2="recurring">Recurring</button></div>
+      <div class="lbl">Type, optional</div>
+      <div class="seg" id="seg"><button type="button" data-b="" class="${!st.bucket?'on':''}">None</button><button type="button" data-b="fixed" class="${st.bucket==='fixed'?'on':''}">Fixed</button><button type="button" data-b="oneoff" class="${st.bucket==='oneoff'?'on':''}">One-off</button></div>
+      <p class="muted small" style="margin:6px 0 0">Expenses without a type count as recurring in reports and budgets.</p>
     </div>
-    <div class="keypad">${['1','2','3','4','5','6','7','8','9','.','0','⌫'].map(k=>`<button type="button" class="key" data-k="${k}" aria-label="${k==='⌫'?'Backspace':k}">${k}</button>`).join('')}</div>
     <div class="btns">${isNew?'<button class="btn" id="next">Save & add next</button>':''}<button class="btn primary" id="save">${isNew?'Save':'Save changes'}</button></div>`;
   };
-  return {tall:true,html,bind:()=>{
+  return {html,bind:()=>{
     const paintSugg=()=>{$('#sugg').innerHTML=suggestions(st.desc).map(m=>`<button type="button" class="chip sug" data-d="${esc(m.desc)}" data-a="${m.amt}" data-c="${m.cat}">${esc(m.desc)} <span class="num">${inr(m.amt,1)}</span></button>`).join('')};
     const paintCats=()=>{$('#cats').innerHTML=catChips()};
     const rerender=()=>{const y=sheetEl.scrollTop;replaceSheet(view_);sheetEl.scrollTop=y};
     paintSugg();
     const desc=$('#desc');
     desc.oninput=()=>{st.desc=desc.value;if(!st.catTouched){const g=st.desc.trim()?autoCat(st.desc):null;st.cat=g==='other'?null:g;paintCats()}paintSugg()};
-    $('#sugg').onclick=ev=>{const c=ev.target.closest('[data-d]');if(!c)return;st.desc=c.dataset.d;desc.value=st.desc;if(!st.amt)st.amt=String(+c.dataset.a);if(!st.catTouched)st.cat=resolve(c.dataset.c);$('#amtV').innerHTML=fmtAmt();paintCats();paintSugg();desc.blur()};
+    const amt=$('#amt');
+    const sizeAmt=()=>{amt.size=Math.max(1,(amt.value||'0').length)};
+    amt.oninput=()=>{let v=amt.value.replace(/[^\d.]/g,'');const p=v.split('.');if(p.length>2)v=p[0]+'.'+p.slice(1).join('');const q=v.split('.');if(q[1]&&q[1].length>2)v=q[0]+'.'+q[1].slice(0,2);amt.value=v;st.amt=v;sizeAmt()};
+    amt.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();desc.focus()}};
+    desc.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();desc.blur()}};
+    if(isNew&&!st.amt)setTimeout(()=>amt.focus(),330);
+    $('#sugg').onclick=ev=>{const c=ev.target.closest('[data-d]');if(!c)return;st.desc=c.dataset.d;desc.value=st.desc;if(!st.amt){st.amt=String(+c.dataset.a);amt.value=st.amt;sizeAmt()}if(!st.catTouched)st.cat=resolve(c.dataset.c);paintCats();paintSugg();desc.blur()};
     $('#cats').onclick=ev=>{const a=ev.target.closest('[data-all]');if(a){st.allCats=!st.allCats;paintCats();return}const c=ev.target.closest('[data-c]');if(!c)return;st.cat=c.dataset.c;st.catTouched=true;paintCats()};
     $('#moreT').onclick=()=>{st.more=!st.more;rerender()};
     const dt=$('#date');if(dt)dt.onchange=()=>{st.date=dt.value||today()};
-    sheetEl.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{st.bucket=b.dataset.b||null;rerender()});
-    sheetEl.querySelectorAll('[data-b2]').forEach(b=>b.onclick=()=>{st.bucket=st.bucket===b.dataset.b2?null:b.dataset.b2;rerender()});
+    sheetEl.querySelectorAll('#seg [data-b]').forEach(b=>b.onclick=()=>{st.bucket=b.dataset.b||null;rerender()});
     $('#cls').onclick=popSheet;
-    sheetEl.querySelector('.keypad').onclick=ev=>{const k=ev.target.closest('[data-k]');if(!k)return;const v=k.dataset.k;
-      if(v==='⌫')st.amt=st.amt.slice(0,-1);
-      else if(v==='.'){if(!st.amt.includes('.'))st.amt=(st.amt||'0')+'.'}
-      else{const [i,f]=st.amt.split('.');if(f!==undefined&&f.length>=2)return;if(f===undefined&&(i||'').length>=8)return;st.amt=(st.amt==='0'?'':st.amt)+v}
-      $('#amtV').innerHTML=fmtAmt();if(document.activeElement===desc)desc.blur()};
     const commit=()=>{
       const a=parseFloat(st.amt);
-      if(!(a>0)){toast('Enter an amount');return null}
+      if(!(a>0)){toast('Enter an amount');amt.focus();return null}
       const c=st.cat||(st.desc.trim()?autoCat(st.desc):'other');
       const rec={id:e?e.id:uid(),date:st.date,desc:st.desc.trim()||'(unlabelled)',amount:r2(a),cat:c,created:e&&e.created||Date.now()};
-      if(st.bucket&&st.bucket!==D.cats[c].bucket)rec.bucket=st.bucket;
+      if(st.bucket)rec.bucket=st.bucket;
       if(isNew)D.entries.push(rec);else D.entries=D.entries.map(x=>x.id===id?rec:x);
       save();view.month=monthKey(rec.date);if(view.tab!=='log'&&view.tab!=='report')view.tab='log';render();scheduleReminder();return rec;
     };
@@ -737,35 +734,32 @@ function categoriesView(){
   return {html:()=>{
     const cnt={};D.entries.forEach(e=>{const c=resolve(e.cat);cnt[c]=(cnt[c]||0)+1});
     return `<div class="sh"><button class="ibtn left" id="cls" aria-label="Back">${ICONS.back}</button><h2>Categories</h2><button class="ibtn" id="newC" aria-label="New category">${ICONS.plus}</button></div>
-    ${['fixed','recurring','oneoff'].map(b=>{const ids=Object.keys(D.cats).filter(id=>D.cats[id].bucket===b).sort((x,y)=>D.cats[x].name.localeCompare(D.cats[y].name));
-      return ids.length?`<div class="group" style="margin-top:14px"><h3>${BUCKETS[b]}</h3>${ids.map(id=>`<div class="item" data-id="${id}"><div class="key-l"><span class="dot" style="background:${D.cats[id].color}"></span><div><div>${esc(D.cats[id].name)}</div><div class="s">${cnt[id]||0} expense${cnt[id]===1?'':'s'}${(D.cats[id].kw||[]).length?', matches '+esc(D.cats[id].kw.join(', ')):''}</div></div></div><span class="chev">›</span></div>`).join('')}</div>`:''}).join('')}`},
+    ${[0].map(()=>{const ids=Object.keys(D.cats).sort((x,y)=>D.cats[x].name.localeCompare(D.cats[y].name));
+      return `<div class="group" style="margin-top:14px">${ids.map(id=>`<div class="item" data-id="${id}"><div class="key-l"><span class="dot" style="background:${D.cats[id].color}"></span><div><div>${esc(D.cats[id].name)}</div><div class="s">${cnt[id]||0} expense${cnt[id]===1?'':'s'}${(D.cats[id].kw||[]).length?', matches '+esc(D.cats[id].kw.join(', ')):''}</div></div></div><span class="chev">›</span></div>`).join('')}</div>`}).join('')}`},
   bind:()=>{$('#cls').onclick=popSheet;$('#newC').onclick=()=>pushSheet(catEdit(null));sheetEl.querySelectorAll('.item').forEach(i=>i.onclick=()=>pushSheet(catEdit(i.dataset.id)))}};
 }
 function catEdit(id){
-  const isNew=!id,c=id?D.cats[id]:{name:'',bucket:'recurring',color:COLORS[Object.keys(D.cats).length%COLORS.length],kw:[]};
-  const st={bucket:c.bucket,color:c.color,deleting:false};
+  const isNew=!id,c=id?D.cats[id]:{name:'',color:COLORS[Object.keys(D.cats).length%COLORS.length],kw:[]};
+  const st={color:c.color};
   const n=id?D.entries.filter(e=>resolve(e.cat)===id).length:0;
   return {html:()=>`
     <div class="sh"><button class="ibtn left" id="cls" aria-label="Back">${ICONS.back}</button><h2>${isNew?'New category':'Edit category'}</h2><span style="width:40px"></span></div>
     <div class="lbl">Name</div><input id="cN" value="${esc(c.name)}" placeholder="e.g. Gym" autocomplete="off">
-    <div class="lbl">Counts as</div>
-    <div class="seg" id="cB">${Object.entries(BUCKETS).map(([b,t])=>`<button type="button" data-b="${b}" class="${st.bucket===b?'on':''}">${t}</button>`).join('')}</div>
     <div class="lbl">Colour</div>
     <div class="swatches" id="cC">${COLORS.concat('#8b9096').map(col=>`<button type="button" data-col="${col}" class="${st.color===col?'on':''}" style="background:${col}" aria-label="Colour ${col}"></button>`).join('')}</div>
     <div class="lbl">Auto-match words</div>
     <input id="cK" value="${esc((c.kw||[]).join(', '))}" placeholder="e.g. uber, ola, rapido" autocomplete="off">
     <p class="muted small" style="margin:6px 0 0">Expenses whose description contains any of these words go into this category automatically.</p>
-    ${!isNew&&id!=='other'?`<div id="delBox" style="margin-top:24px" ${st.deleting?'':'hidden'}><div class="lbl">Move its ${n} expense${n===1?'':'s'} to</div><select id="cT">${Object.keys(D.cats).filter(x=>x!==id).sort((a,b)=>D.cats[a].name.localeCompare(D.cats[b].name)).map(x=>`<option value="${x}" ${x==='other'?'selected':''}>${esc(D.cats[x].name)}</option>`).join('')}</select><div class="btns"><button class="btn" id="cDelNo">Keep category</button><button class="btn danger" id="cDelYes">Delete and move</button></div></div>`:''}
+    ${!isNew&&id!=='other'?`<div id="delBox" style="margin-top:24px" hidden><div class="lbl">Move its ${n} expense${n===1?'':'s'} to</div><select id="cT">${Object.keys(D.cats).filter(x=>x!==id).sort((a,b)=>D.cats[a].name.localeCompare(D.cats[b].name)).map(x=>`<option value="${x}" ${x==='other'?'selected':''}>${esc(D.cats[x].name)}</option>`).join('')}</select><div class="btns"><button class="btn" id="cDelNo">Keep category</button><button class="btn danger" id="cDelYes">Delete and move</button></div></div>`:''}
     <div class="btns" id="mainBtns">${!isNew&&id!=='other'?'<button class="btn danger" id="cDel">Delete</button>':''}<button class="btn primary" id="cSave">${isNew?'Create category':'Save changes'}</button></div>`,
   bind:()=>{
     $('#cls').onclick=popSheet;
-    $('#cB').onclick=e=>{const b=e.target.closest('[data-b]');if(!b)return;st.bucket=b.dataset.b;$('#cB').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))};
     $('#cC').onclick=e=>{const b=e.target.closest('[data-col]');if(!b)return;st.color=b.dataset.col;$('#cC').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))};
     $('#cSave').onclick=()=>{
       const name=$('#cN').value.trim();if(!name){toast('Give the category a name');$('#cN').focus();return}
       if(Object.entries(D.cats).some(([x,v])=>x!==id&&v.name.toLowerCase()===name.toLowerCase())){toast('A category with that name exists');return}
       const kw=$('#cK').value.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
-      const nid=id||('c_'+uid());D.cats[nid]={name,bucket:st.bucket,color:st.color,kw};
+      const nid=id||('c_'+uid());D.cats[nid]={name,color:st.color,kw};
       save();popSheet();render();toast(isNew?'Category created':'Category saved');
     };
     const d=$('#cDel');if(d)d.onclick=()=>{$('#delBox').hidden=false;$('#mainBtns').hidden=true;$('#delBox').scrollIntoView({behavior:'smooth'})};
@@ -806,7 +800,7 @@ function importView(){
   let parsed=null;
   return {html:()=>`
     <div class="sh"><button class="ibtn left" id="cls" aria-label="Back">${ICONS.back}</button><h2>Import from Excel</h2><span style="width:40px"></span></div>
-    <p class="muted small" style="margin:0">Copy the date, description and amount columns from your sheet and paste them below. A row without a date uses the date above it.</p>
+    <p class="muted small" style="margin:0">Copy the date, description and amount columns from your sheet and paste them below. A row without a date uses the date above it. Rent, physio bills, trips and one-time purchases get the same type as in your monthly reports.</p>
     <textarea id="pTxt" style="min-height:170px;margin-top:12px;font-size:13px" placeholder="1/11/26	PG to Ofc	₹82.00
 	Lunch at Ofc	₹179.00"></textarea>
     <div id="pPrev"></div>
@@ -815,7 +809,7 @@ function importView(){
     $('#cls').onclick=popSheet;
     $('#pCheck').onclick=()=>{
       parsed=parsePaste($('#pTxt').value);
-      parsed.rows.forEach(r=>{r.cat=r.desc==='(unlabelled)'?resolve(r.cat):autoCat(r.desc)});
+      parsed.rows.forEach(r=>{const rule=r.cat;r.cat=r.desc==='(unlabelled)'?resolve(rule):autoCat(r.desc);const b=(CATS[rule]||[])[2];if(b&&b!=='recurring')r.bucket=b});
       const have=new Set(D.entries.map(e=>e.date+'|'+e.desc.toLowerCase()+'|'+e.amount));
       parsed.fresh=parsed.rows.filter(r=>!have.has(isoDay(r.date)+'|'+r.desc.toLowerCase()+'|'+r.amount));
       const byM={};parsed.fresh.forEach(r=>{const m=isoDay(r.date).slice(0,7);(byM[m]=byM[m]||{n:0,t:0});byM[m].n++;byM[m].t+=r.amount});
@@ -826,7 +820,7 @@ function importView(){
       $('#pGo').disabled=!parsed.fresh||!parsed.fresh.length;
     };
     $('#pTxt').oninput=()=>{$('#pGo').disabled=true};
-    $('#pGo').onclick=()=>{const now=Date.now();parsed.fresh.forEach((r,i)=>D.entries.push({id:uid()+i,date:isoDay(r.date),desc:r.desc,amount:r.amount,cat:r.cat,created:now+i}));save();const n=parsed.fresh.length;view.month=monthsWithData().slice(-1)[0]||view.month;popSheet();render();toast(`Imported ${n} expenses`)};
+    $('#pGo').onclick=()=>{const now=Date.now();parsed.fresh.forEach((r,i)=>D.entries.push(Object.assign({id:uid()+i,date:isoDay(r.date),desc:r.desc,amount:r.amount,cat:r.cat,created:now+i},r.bucket?{bucket:r.bucket}:{})));save();const n=parsed.fresh.length;view.month=monthsWithData().slice(-1)[0]||view.month;popSheet();render();toast(`Imported ${n} expenses`)};
   }};
 }
 
@@ -861,8 +855,8 @@ function buildXlsx(){
   const ms=monthsWithData(),st=ms.map(stats);
   const s2=[['Month','Total spent','Fixed','Recurring','One-offs','Food delivery','Delivery orders','Salary','Saved / invested','Left after savings'],...ms.map((m,i)=>[mFull(m),r2(st[i].total),r2(st[i].b.fixed),r2(st[i].b.recurring),r2(st[i].b.oneoff),r2(st[i].deliv.sum),st[i].deliv.n,+st[i].inc.salary||0,st[i].saved,r2(st[i].net)])];
   const ids=Object.keys(D.cats).filter(c=>D.entries.some(e=>resolve(e.cat)===c));
-  const s3=[['Category','Type',...ms.map(mFull)],...ids.map(c=>[D.cats[c].name,BUCKETS[D.cats[c].bucket],...st.map(s=>r2(s.by[c]||0))])];
-  const names=['Expenses','Monthly summary','By category'],sheets=[s1,s2,s3],widths=[[12,34,28,11,13],[18,13,11,12,11,13,15,11,15,17],[30,11,...ms.map(()=>15)]];
+  const s3=[['Category',...ms.map(mFull)],...ids.map(c=>[D.cats[c].name,...st.map(s=>r2(s.by[c]||0))])];
+  const names=['Expenses','Monthly summary','By category'],sheets=[s1,s2,s3],widths=[[12,34,28,11,13],[18,13,11,12,11,13,15,11,15,17],[30,...ms.map(()=>15)]];
   const files=[
     ['[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${names.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
     ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
