@@ -851,12 +851,28 @@ function sheetXML(rows,widths){
 }
 function buildXlsx(){
   const es=[...D.entries].sort((a,b)=>a.date.localeCompare(b.date)||(a.created||0)-(b.created||0));
-  const s1=[['Date','Description','Category','Type','Amount (₹)'],...es.map(e=>[{date:e.date},e.desc,catName(e.cat),BUCKETS[bucketOf(e)],e.amount])];
+  const s1=[['Date','Description','Category','Amount (₹)','Type (if set)'],...es.map(e=>[{date:e.date},e.desc,catName(e.cat),e.amount,e.bucket?BUCKETS[e.bucket]:''])];
   const ms=monthsWithData(),st=ms.map(stats);
   const s2=[['Month','Total spent','Fixed','Recurring','One-offs','Food delivery','Delivery orders','Salary','Saved / invested','Left after savings'],...ms.map((m,i)=>[mFull(m),r2(st[i].total),r2(st[i].b.fixed),r2(st[i].b.recurring),r2(st[i].b.oneoff),r2(st[i].deliv.sum),st[i].deliv.n,+st[i].inc.salary||0,st[i].saved,r2(st[i].net)])];
   const ids=Object.keys(D.cats).filter(c=>D.entries.some(e=>resolve(e.cat)===c));
   const s3=[['Category',...ms.map(mFull)],...ids.map(c=>[D.cats[c].name,...st.map(s=>r2(s.by[c]||0))])];
-  const names=['Expenses','Monthly summary','By category'],sheets=[s1,s2,s3],widths=[[12,34,28,11,13],[18,13,11,12,11,13,15,11,15,17],[30,...ms.map(()=>15)]];
+  return workbook(['Expenses','Monthly summary','By category'],[s1,s2,s3],[[12,34,26,13,13],[18,13,11,12,11,13,15,11,15,17],[30,...ms.map(()=>15)]]);
+}
+/* one month, laid out like your monthly reports */
+function buildMonthXlsx(k){
+  const st=stats(k),T=st.total;
+  const es=[...st.es].sort((a,b)=>a.date.localeCompare(b.date)||(a.created||0)-(b.created||0));
+  const sum=[['Item','Amount (₹)'],['Salary',+st.inc.salary||0],...(st.inc.saves||[]).map(x=>[x.name,+x.amount||0]),['Total saved / invested',st.saved],['Total spent',r2(T)],['Left after savings',r2(st.net)],['',''],
+    ['Fixed',r2(st.b.fixed)],['Recurring',r2(st.b.recurring)],['One-offs',r2(st.b.oneoff)],['',''],['Food delivery orders',st.deliv.n],['Food delivery total',r2(st.deliv.sum)],['Average order',st.deliv.n?r2(st.deliv.sum/st.deliv.n):0]];
+  const exp=[['Date','Description','Category','Amount (₹)','Type (if set)'],...es.map(e=>[{date:e.date},e.desc,catName(e.cat),e.amount,e.bucket?BUCKETS[e.bucket]:''])];
+  const cats=Object.entries(st.by).sort((a,b)=>b[1]-a[1]);
+  const cat=[['Category','Entries','Amount (₹)','Share %'],...cats.map(([c,v])=>[catName(c),st.cnt[c],r2(v),Math.round(v/T*1000)/10]),['Total',st.es.length,r2(T),100]];
+  const one=es.filter(e=>bucketOf(e)==='oneoff').sort((a,b)=>b.amount-a.amount);
+  const ones=[['Item','Date','Amount (₹)'],...one.map(e=>[e.desc,{date:e.date},e.amount]),['Total','',r2(st.b.oneoff)]];
+  const wk=[['Week','Recurring (₹)','Of which delivery (₹)'],...st.weeks.map(w=>[`${w.a}–${w.z} ${mShort(k)}`,r2(w.rec),r2(w.del)]),['Total',r2(st.b.recurring),r2(st.deliv.sum)]];
+  return workbook(['Summary','Expenses','Categories','One-offs','Week by week'],[sum,exp,cat,ones,wk],[[26,16],[12,34,26,13,13],[30,10,14,10],[34,12,14],[18,16,22]]);
+}
+function workbook(names,sheets,widths){
   const files=[
     ['[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${names.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
     ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
@@ -867,6 +883,7 @@ function buildXlsx(){
   ];
   return zip(files);
 }
+
 async function shareBlob(blob,name){
   if(NATIVE){
     picking=true;
@@ -881,6 +898,29 @@ async function shareBlob(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
 }
 function pickJSON(){return new Promise(res=>{const fp=$('#filePick');fp.value='';picking=true;fp.onchange=async()=>{const f=fp.files[0];setTimeout(()=>{picking=false},800);if(!f)return res(null);try{res(JSON.parse(await f.text()))}catch(e){toast('That file is not a Ledger backup');res(null)}};fp.click()})}
+
+/* ============ Export chooser ============ */
+function exportView(){
+  const ms=monthsWithData().reverse();
+  let pick=ms.includes(thisMonth())?thisMonth():(ms[0]||thisMonth());
+  return {html:()=>`
+    <div class="sh"><button class="ibtn left" id="cls" aria-label="Back">${ICONS.back}</button><h2>Export to Excel</h2><span style="width:40px"></span></div>
+    <div class="item" id="xThis" style="border-top:1px solid var(--rule)"><div><div>${esc(mFull(thisMonth()))}</div><div class="s">${inMonth(thisMonth()).length} expenses, laid out like your monthly report</div></div><span class="chev">›</span></div>
+    <div class="item" id="xAll"><div><div>All months</div><div class="s">${D.entries.length} expenses, with a monthly summary and category trend</div></div><span class="chev">›</span></div>
+    <div class="lbl" style="margin-top:22px">Or pick a month</div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:10px">
+      <select id="xM">${ms.map(m=>`<option value="${m}" ${m===pick?'selected':''}>${esc(mFull(m))} (${inMonth(m).length})</option>`).join('')}</select>
+      <button class="btn primary sm" id="xGo" ${ms.length?'':'disabled'}>Export</button>
+    </div>
+    <p class="muted small" style="margin-top:14px">A single month has five sheets: summary, expenses, categories, one-offs and week by week.</p>`,
+  bind:()=>{
+    $('#cls').onclick=popSheet;
+    const month=k=>{if(!inMonth(k).length){toast(`No expenses in ${mFull(k)}`);return}shareBlob(buildMonthXlsx(k),`ledger-${mLong(k).toLowerCase()}-${k.slice(0,4)}.xlsx`)};
+    $('#xThis').onclick=()=>month(thisMonth());
+    $('#xAll').onclick=()=>{if(D.entries.length)shareBlob(buildXlsx(),`ledger-all-${today()}.xlsx`)};
+    $('#xGo').onclick=()=>month($('#xM').value);
+  }};
+}
 
 /* ============ Settings ============ */
 function renderSettings(){
@@ -897,7 +937,7 @@ function renderSettings(){
     </div>
     <div class="group"><h3>Your data</h3>
       ${item('sImp','Import from Excel','Paste rows copied from your sheet')}
-      ${item('sXls','Export to Excel',n?`${n} expenses in 3 sheets`:'Nothing to export yet')}
+      ${item('sXls','Export to Excel',n?'One month or all months':'Nothing to export yet')}
       ${item('sBak','Save a backup','A file you can keep in Google Drive')}
       ${item('sRes','Restore a backup','Replaces everything in Ledger')}
     </div>
@@ -907,7 +947,7 @@ function renderSettings(){
   const on=(id,f)=>{const el=$('#'+id);if(el)el.onclick=f};
   on('sPlan',()=>pushSheet(incomeView(null)));on('sBud',()=>pushSheet(budgetView()));on('sCat',()=>pushSheet(categoriesView()));on('sRem',()=>pushSheet(reminderView()));
   on('sImp',()=>pushSheet(importView()));
-  on('sXls',()=>{if(n)shareBlob(buildXlsx(),`ledger-${today()}.xlsx`)});
+  on('sXls',()=>{if(n)pushSheet(exportView())});
   on('sBak',()=>shareBlob(new Blob([JSON.stringify({app:'ledger',v:2,saved:Date.now(),data:D})],{type:'application/json'}),`ledger-backup-${today()}.json`));
   on('sRes',async()=>{const j=await pickJSON();if(!j)return;if(j.app!=='ledger'||!j.data){toast('That file is not a Ledger backup');return}
     if(!await dialog({title:'Restore this backup?',message:`It contains ${j.data.entries.length} expenses. Everything in Ledger now will be replaced.`,ok:'Restore',danger:true}))return;
