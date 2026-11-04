@@ -351,7 +351,7 @@ const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capa
 const nat=(p,m,o={})=>window.Capacitor.nativePromise(p,m,o);
 const STORE='ledger.v1',SETTINGS='ledger.settings';
 const BUCKETS={fixed:'Fixed',recurring:'Recurring',oneoff:'One-off'};
-const inr=(n,dp)=>(n<0?'−':'')+'₹'+Math.abs(dp?Math.round(n*100)/100:Math.round(n)).toLocaleString('en-IN',{maximumFractionDigits:dp?2:0});
+const inr=(n,dp)=>{const v=Math.abs(dp?Math.round(n*100)/100:Math.round(n));const frac=dp&&v%1!==0;return (n<0?'−':'')+'₹'+v.toLocaleString('en-IN',{minimumFractionDigits:frac?2:0,maximumFractionDigits:frac?2:0})};
 const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
 const pad=n=>String(n).padStart(2,'0');
 const isoDay=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -437,12 +437,12 @@ function stats(k){
 /* ============ Navigation: sheets + Android back ============ */
 const stack=[];let dlg=null,skipPop=0,closeT=null;
 function renderTop(){const v=stack[stack.length-1];sheetEl.classList.toggle('tall',!!v.tall);sheetEl.innerHTML='<div class="grab"></div>'+v.html();v.bind&&v.bind()}
-function pushSheet(v){clearTimeout(closeT);overlay.classList.remove('closing');const first=!stack.length;stack.push(v);history.pushState({l:stack.length},'');renderTop();sheetEl.scrollTop=0;if(first)overlay.classList.add('open')}
+function pushSheet(v){guard();clearTimeout(closeT);overlay.classList.remove('closing');const first=!stack.length;stack.push(v);history.pushState({l:stack.length},'');renderTop();sheetEl.scrollTop=0;if(first)overlay.classList.add('open')}
 function replaceSheet(v){stack[stack.length-1]=v;renderTop()}
 const popSheet=()=>{if(stack.length)history.back()};
 function hideOverlay(){overlay.classList.add('closing');clearTimeout(closeT);closeT=setTimeout(()=>{overlay.classList.remove('open','closing');sheetEl.innerHTML=''},240)}
 function closeAll(){const n=stack.length+(dlg?1:0);if(dlg){const d=dlg;dlg=null;$('#dialog').classList.remove('open');d(null)}if(!n)return;if(stack.length){stack.length=0;hideOverlay()}skipPop++;history.go(-n)}
-addEventListener('popstate',()=>{if(skipPop){skipPop--;return}if(dlg){const d=dlg;dlg=null;$('#dialog').classList.remove('open');d(null);return}if(stack.length){stack.pop();stack.length?renderTop():hideOverlay()}});
+addEventListener('popstate',()=>{if(skipPop){skipPop--;return}if(dlg){const d=dlg;dlg=null;$('#dialog').classList.remove('open');d(null);return}if(stack.length){stack.pop();stack.length?renderTop():hideOverlay();return}onRootBack()});
 $('#scrim').onclick=()=>closeAll();
 let drag=null;
 sheetEl.addEventListener('touchstart',e=>{drag=sheetEl.scrollTop<=0&&!e.target.closest('.chips')?{y:e.touches[0].clientY,dy:0,on:false}:null},{passive:true});
@@ -453,7 +453,7 @@ function dialog({title,message='',input=null,placeholder='',ok='OK',cancel='Canc
   return new Promise(res=>{
     const el=$('#dialog');
     el.innerHTML=`<div class="dlg"><h3>${esc(title)}</h3>${message?`<p class="muted" style="margin:0 0 14px">${esc(message)}</p>`:''}${input?`<input id="dIn" type="${input}" placeholder="${esc(placeholder)}">`:''}<div class="btns"><button class="btn" id="dNo">${esc(cancel)}</button><button class="btn ${danger?'danger':'primary'}" id="dOk">${esc(ok)}</button></div></div>`;
-    el.classList.add('open');history.pushState({d:1},'');dlg=res;
+    guard();el.classList.add('open');history.pushState({d:1},'');dlg=res;
     const fin=v=>{if(dlg!==res)return;dlg=null;el.classList.remove('open');skipPop++;history.back();res(v)};
     $('#dNo').onclick=()=>fin(null);$('#dOk').onclick=()=>fin(input?$('#dIn').value:true);
     if(input)setTimeout(()=>$('#dIn').focus(),60);
@@ -491,6 +491,24 @@ async function scheduleReminder(){
   }catch(e){console.warn('reminder',e)}
 }
 
+/* ============ Back navigation: tabs + "press back again to exit" ============ */
+let atRoot=false,rootT=null;
+function guard(){if(atRoot){clearTimeout(rootT);atRoot=false;history.pushState({home:1},'')}}
+function goTab(t){
+  if(t===view.tab)return;
+  guard();
+  if(view.tab==='log')history.pushState({tab:t},'');
+  else if(t==='log'){history.back();return}   // popstate brings us home
+  else history.replaceState({tab:t},'');
+  view.tab=t;render();app.scrollTop=0;
+}
+function onRootBack(){
+  if(view.tab!=='log'){view.tab='log';render();app.scrollTop=0;return}
+  atRoot=true;toast('Press back again to exit');
+  clearTimeout(rootT);rootT=setTimeout(()=>{if(atRoot&&!stack.length){atRoot=false;history.pushState({home:1},'')}},2000);
+}
+history.replaceState({root:1},'');history.pushState({home:1},'');
+
 /* ============ Shell ============ */
 const view={tab:'log',month:thisMonth()};
 const TABS=[['log','Ledger','<path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/>'],['report','Report','<circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/>'],['trend','Trend','<path d="M4 20h16M7 16v-5M12 16V7M17 16v-8"/>'],['settings','Settings','<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/>']];
@@ -506,7 +524,7 @@ function render(){
     <div id="body" class="${isLog?'float':''}"></div>
     ${view.tab==='log'?`<button class="fab" id="add">${ICONS.plus}Add expense</button>`:''}
     <nav class="tabs"><div class="in">${TABS.map(([id,t,p])=>`<button class="tab ${view.tab===id?'on':''}" data-tab="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>${t}</button>`).join('')}</div></nav>`;
-  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{view.tab=b.dataset.tab;render();app.scrollTop=0});
+  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
   if(month){$('#mPrev').onclick=()=>{view.month=addMonth(view.month,-1);render()};$('#mNext').onclick=()=>{view.month=addMonth(view.month,1);render()}}
   const s=$('#srch');if(s)s.onclick=()=>pushSheet(searchView());
   const a=$('#add');if(a)a.onclick=()=>pushSheet(entryView());
@@ -627,7 +645,7 @@ function entryView(id,keep){
       const rec={id:e?e.id:uid(),date:st.date,desc:st.desc.trim()||'(unlabelled)',amount:r2(a),cat:c,created:e&&e.created||Date.now()};
       if(st.bucket)rec.bucket=st.bucket;
       if(isNew)D.entries.push(rec);else D.entries=D.entries.map(x=>x.id===id?rec:x);
-      save();view.month=monthKey(rec.date);if(view.tab!=='log'&&view.tab!=='report')view.tab='log';render();scheduleReminder();return rec;
+      save();view.month=monthKey(rec.date);render();scheduleReminder();return rec;
     };
     $('#save').onclick=()=>{const r=commit();if(r){popSheet();toast(isNew?`Saved ${inr(r.amount,1)}`:'Changes saved')}};
     const nx=$('#next');if(nx)nx.onclick=()=>{const r=commit();if(r){view_=entryView(null,r.date);replaceSheet(view_);toast(`Saved ${inr(r.amount,1)}`)}};
@@ -741,7 +759,7 @@ function renderTrend(){
       ${row('Saved',s=>inr(s.saved))}${row('Left after savings',s=>`<span class="${s.net<0?'neg':''}">${inr(s.net)}</span>`,'tot')}
     </table></div></div>
     <p class="muted small">Tap a bar to open that month's report.</p>`;
-  $('#body').querySelectorAll('.bar').forEach(c=>c.onclick=()=>{view.month=c.dataset.m;view.tab='report';render();app.scrollTop=0});
+  $('#body').querySelectorAll('.bar').forEach(c=>c.onclick=()=>{view.month=c.dataset.m;goTab('report')});
 }
 
 /* ============ Salary & savings ============ */
