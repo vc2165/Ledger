@@ -8,7 +8,7 @@
   },
   "plugins": {
     "SystemBars": {
-      "style": "LIGHT",
+      "style": "DARK",
       "initialViewportFitValueHint": "cover"
     },
     "LocalNotifications": {

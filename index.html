@@ -18,13 +18,13 @@
 :root{
   --paper:#ffffff;--wash:#f4f5f2;--rule:#e6e7e3;--rule2:#d5d7d2;
   --ink:#1c1f22;--graphite:#62676d;--faint:#8b9096;
-  --green:#17614a;--green-tint:#e8f1ec;--red:#b42318;--amber:#a86400;
-  --c-fixed:#8e949a;--c-rec:#17614a;--c-one:#c08a2e;
+  --green:#5b2fc4;--green-tint:#efe8ff;--red:#d92d3a;--amber:#d98a00;--good:#16935a;
+  --c-fixed:#9a96ad;--c-rec:#5b2fc4;--c-one:#e0952b;--bg:#f3f2f8;--deep:#3f1f8c;
   --st:max(env(safe-area-inset-top),var(--safe-area-inset-top,0px));--sb:max(env(safe-area-inset-bottom),var(--safe-area-inset-bottom,0px));
   --ease:cubic-bezier(.2,.8,.2,1)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
-html,body{margin:0;background:var(--paper);color:var(--ink);font:400 15px/1.45 'Plex',Roboto,system-ui,sans-serif;overscroll-behavior:none;-webkit-font-smoothing:antialiased}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font:400 15px/1.45 'Plex',Roboto,system-ui,sans-serif;overscroll-behavior:none;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 button,label,.chip,.tab,.key{-webkit-user-select:none;user-select:none}
 :focus-visible{outline:2px solid var(--green);outline-offset:2px}
@@ -39,7 +39,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--green)}
 .btn{border:1px solid var(--rule2);background:var(--paper);border-radius:12px;padding:12px 16px;font-weight:500;cursor:pointer;width:100%;transition:background .15s}
 .btn:active{background:var(--wash)}
 .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
-.btn.primary:active{background:#124f3c}
+.btn.primary:active{background:#4a24a6}
 .btn.danger{color:var(--red)}
 .btn.sm{width:auto;padding:8px 14px;font-size:14px}
 .btn:disabled{opacity:.45}
@@ -47,7 +47,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--green)}
 .link{background:none;border:0;color:var(--green);font-weight:500;cursor:pointer;padding:8px 0}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
 
-#app{max-width:640px;margin:0 auto;min-height:100dvh;padding:calc(var(--st) + 14px) 20px calc(96px + var(--sb))}
+#app{position:fixed;inset:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:none;-webkit-overflow-scrolling:touch;padding:calc(var(--st) + 14px) max(20px,calc(50% - 300px)) calc(110px + var(--sb))}
 
 /* header */
 .head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
@@ -97,7 +97,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--green)}
 /* extended FAB */
 .fab{position:fixed;right:max(20px,calc(50% - 300px));bottom:calc(78px + var(--sb));height:52px;padding:0 20px 0 16px;border-radius:16px;border:0;background:var(--green);color:#fff;font-weight:500;display:flex;align-items:center;gap:8px;cursor:pointer;box-shadow:0 8px 24px rgba(23,97,74,.28);z-index:11}
 .fab svg{width:22px;height:22px}
-.fab:active{background:#124f3c}
+.fab:active{background:#4a24a6}
 
 /* tabs */
 .tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-top:1px solid var(--rule);display:flex;justify-content:center;padding-bottom:var(--sb);z-index:10}
@@ -164,7 +164,7 @@ h4{font-size:14px;font-weight:600;margin:18px 0 2px}
 #overlay.open{visibility:visible}
 #scrim{position:absolute;inset:0;background:rgba(20,24,22,.32);opacity:0;transition:opacity .22s}
 #overlay.open #scrim{opacity:1}
-#sheet{position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;max-height:calc(100dvh - var(--st) - 8px);overflow-y:auto;background:var(--paper);border-radius:20px 20px 0 0;padding:8px 20px calc(20px + var(--sb));transform:translateY(100%);transition:transform .28s var(--ease)}
+#sheet{overscroll-behavior:contain;position:absolute;left:0;right:0;bottom:0;max-width:640px;margin:0 auto;max-height:calc(100dvh - var(--st) - 8px);overflow-y:auto;background:var(--paper);border-radius:20px 20px 0 0;padding:8px 20px calc(20px + var(--sb));transform:translateY(100%);transition:transform .28s var(--ease)}
 #sheet.tall{height:calc(100dvh - var(--st) - 8px)}
 #overlay.open #sheet{transform:none}
 #overlay.closing #sheet{transform:translateY(100%)}#overlay.closing #scrim{opacity:0}
@@ -208,6 +208,53 @@ h4{font-size:14px;font-weight:600;margin:18px 0 2px}
 #toast.show{opacity:1;transform:translateX(-50%)}
 #toast button{background:none;border:0;color:#9fd8bf;font-weight:600;cursor:pointer;padding:0;pointer-events:auto}
 .lock{min-height:80dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
+/* ===== Bold card theme ===== */
+html,body{background:var(--bg)}
+#app{padding:0 0 calc(116px + var(--sb))!important;background:var(--bg)}
+.band{background:linear-gradient(160deg,var(--deep) 0%,#5b2fc4 72%,#6a3fd6 100%);color:#fff;padding:calc(var(--st) + 14px) max(20px,calc(50% - 300px)) 22px;border-radius:0 0 26px 26px;margin-bottom:16px}
+.band.tall{padding-bottom:66px;margin-bottom:0}
+.band-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.band .title{color:#fff;font-size:24px}
+.band .title small{color:rgba(255,255,255,.72)}
+.band .ibtn{background:rgba(255,255,255,.16);color:#fff;border-radius:50%;width:40px;height:40px}
+.band .ibtn:active{background:rgba(255,255,255,.28)}
+.hbtns{gap:8px}
+.b-sp{margin-top:20px;font-size:13px;color:rgba(255,255,255,.78)}
+.b-v{font-size:38px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+#body{padding:0 max(16px,calc(50% - 304px))}
+#body.float{margin-top:-46px}
+.card{background:#fff;border-radius:18px;box-shadow:0 2px 10px rgba(40,20,90,.07);padding:14px 16px;margin-bottom:14px}
+.card .sec:first-child{margin-top:0}
+.card .meters{border:0;padding:0}
+.card .netline{border-bottom:0;border-top:1px solid #f0eef6;margin-top:14px;padding-bottom:0}
+.track{height:6px;border-radius:6px;background:#ece9f5}.track i{border-radius:6px;background:var(--green)}
+.meter .v{font-weight:600}
+.netline .num:not(.neg){color:var(--good)}
+.notes-card .notes{margin:0;border-left:0;padding-left:0}
+.notes-card .notes p{padding:6px 0;margin:0;border-top:1px solid #f4f2f8}.notes-card .notes p:first-child{border-top:0}
+.log{margin-top:0}
+.day{background:#fff;border-radius:18px;box-shadow:0 2px 10px rgba(40,20,90,.07);padding:4px 16px 6px;margin-bottom:12px}
+.dh{display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--graphite);padding:10px 0 4px}
+.day .ent+.ent .fg{border-top:1px solid #f4f2f8}
+.ent .fg{align-items:center;padding:10px 0}
+.av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:600;flex:none;letter-spacing:.02em}
+.ent .a{font-weight:600;padding-top:0}
+.ent .d .t{font-weight:500}
+.empty{background:#fff;border-radius:18px;box-shadow:0 2px 10px rgba(40,20,90,.07)}
+.fab{border-radius:28px;padding:0 22px 0 18px;height:54px;box-shadow:0 8px 22px rgba(91,47,196,.38);white-space:nowrap}
+.tabs{background:#fff;border-top:0;box-shadow:0 -2px 12px rgba(40,20,90,.08);border-radius:18px 18px 0 0;backdrop-filter:none}
+.tab{color:#9a96ad;font-weight:600;padding:8px 0 9px}
+.tab svg{width:44px;height:30px;padding:4px 11px;border-radius:15px;box-sizing:border-box}
+.tab.on{color:var(--green)}.tab.on svg{background:var(--green-tint)}
+.group{background:#fff;border-radius:18px;box-shadow:0 2px 10px rgba(40,20,90,.07);padding:12px 16px 2px;margin-bottom:14px}
+.group h3{margin-bottom:2px}
+.group .item:first-of-type{border-top:0}.group .item:last-child{border-bottom:0}
+#body > p.muted{margin:4px 4px 0}
+details.full{border-top:0;margin-top:0;padding-top:0;padding-bottom:4px}
+details.full summary{padding:4px 0}
+.chip.on{color:#3d1f8f}
+.seg button.on{color:#3d1f8f}
+.lock{padding:0 24px}
 </style>
 </head>
 <body>
@@ -452,12 +499,14 @@ function render(){
   const month=view.tab==='log'||view.tab==='report';
   const title={log:mLong(view.month),report:mLong(view.month),trend:'Trend',settings:'Settings'}[view.tab];
   const sub=month?view.month.slice(0,4):view.tab==='trend'?'Month by month':'';
-  app.innerHTML=`<div class="head"><div class="title">${esc(title)}${sub?`<small>${esc(sub)}</small>`:''}</div>
-    <div class="hbtns">${month?`<button class="ibtn" id="mPrev" aria-label="Previous month">${ICONS.prev}</button><button class="ibtn" id="mNext" aria-label="Next month">${ICONS.next}</button>`:''}${view.tab==='log'?`<button class="ibtn" id="srch" aria-label="Search">${ICONS.search}</button>`:''}</div></div>
-    <div id="body"></div>
+  const isLog=view.tab==='log',lst=isLog?stats(view.month):null;
+  app.innerHTML=`<div class="band ${isLog?'tall':''}"><div class="band-top"><div class="title">${esc(title)}${sub?`<small>${esc(sub)}</small>`:''}</div>
+    <div class="hbtns">${month?`<button class="ibtn" id="mPrev" aria-label="Previous month">${ICONS.prev}</button><button class="ibtn" id="mNext" aria-label="Next month">${ICONS.next}</button>`:''}${isLog?`<button class="ibtn" id="srch" aria-label="Search">${ICONS.search}</button>`:''}</div></div>
+    ${isLog?`<div class="b-sp">Spent this month</div><div class="b-v num">${inr(lst.total)}</div>`:''}</div>
+    <div id="body" class="${isLog?'float':''}"></div>
     ${view.tab==='log'?`<button class="fab" id="add">${ICONS.plus}Add expense</button>`:''}
     <nav class="tabs"><div class="in">${TABS.map(([id,t,p])=>`<button class="tab ${view.tab===id?'on':''}" data-tab="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>${t}</button>`).join('')}</div></nav>`;
-  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{view.tab=b.dataset.tab;render();scrollTo(0,0)});
+  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{view.tab=b.dataset.tab;render();app.scrollTop=0});
   if(month){$('#mPrev').onclick=()=>{view.month=addMonth(view.month,-1);render()};$('#mNext').onclick=()=>{view.month=addMonth(view.month,1);render()}}
   const s=$('#srch');if(s)s.onclick=()=>pushSheet(searchView());
   const a=$('#add');if(a)a.onclick=()=>pushSheet(entryView());
@@ -480,27 +529,26 @@ function notes(k,st){
 }
 function entryRow(e){
   const c=cat(e.cat),b=bucketOf(e),def='recurring';
-  return `<div class="ent" data-id="${esc(e.id)}"><div class="bg">Delete</div><div class="fg"><div class="d"><div class="t">${esc(e.desc)}</div><div class="c"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}${b!==def?` <span class="tag">${BUCKETS[b]}</span>`:''}</div></div><div class="a num">${inr(e.amount,1)}</div></div></div>`;
+  return `<div class="ent" data-id="${esc(e.id)}"><div class="bg">Delete</div><div class="fg"><div class="av" style="background:${c.color}1f;color:${c.color}">${esc(initials(c.name))}</div><div class="d"><div class="t">${esc(e.desc)}</div><div class="c">${esc(c.name)}${b!==def?` <span class="tag">${BUCKETS[b]}</span>`:''}</div></div><div class="a num">${inr(e.amount,1)}</div></div></div>`;
 }
 function renderLog(){
   const k=view.month,st=stats(k),B=D.budgets;
   const days={};st.es.forEach(e=>(days[e.date]=days[e.date]||[]).push(e));
   const dates=Object.keys(days).sort().reverse();
   $('#body').innerHTML=`
-    <div class="spent">Spent this month</div>
-    <div class="spent-v num">${inr(st.total)}</div>
-    <div class="meters">
+    <div class="card"><div class="meters">
       ${meter('Recurring',st.b.recurring,B.recurring)}
       ${meter('Delivery',st.deliv.sum,B.delivery)}
       ${meter('One-offs',st.b.oneoff,B.oneoff)}
     </div>
-    <div class="netline"><span class="muted">Left after savings</span><span class="num ${st.net<0?'neg':''}" style="font-weight:500">${inr(st.net)}</span></div>
-    ${notes(k,st)}
+    <div class="netline"><span>Left after savings</span><span class="num ${st.net<0?'neg':''}" style="font-weight:600">${inr(st.net)}</span></div></div>
+    ${(()=>{const n=notes(k,st);return n?`<div class="card notes-card">${n}</div>`:''})()}
     <div class="log">${dates.length?dates.map(dt=>{const d=toDate(dt),list=days[dt].slice().sort((a,b)=>(b.created||0)-(a.created||0));
-      return `<div class="dgroup"><div class="dcol"><div class="dn num">${d.getDate()}</div><div class="dw">${d.toLocaleDateString('en-IN',{weekday:'short'})}</div><div class="dt num">${inr(list.reduce((s,e)=>s+e.amount,0))}</div></div><div>${list.map(entryRow).join('')}</div></div>`}).join('')
+      return `<div class="day"><div class="dh"><span>${d.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</span><span class="num">${inr(list.reduce((s,e)=>s+e.amount,0))}</span></div>${list.map(entryRow).join('')}</div>`}).join('')
       :`<div class="empty"><b>Nothing logged in ${esc(mLong(k))}</b>${D.entries.length?'Add an expense to start this month.':'Add your first expense, or import your Excel history from Settings.'}</div>`}</div>`;
   bindSwipe($('#body .log'));
 }
+const initials=n=>{const w=String(n).replace(/[^A-Za-z0-9 ]/g,' ').split(' ').filter(Boolean);return (w.length>1?w[0][0]+w[1][0]:(w[0]||'?').slice(0,1)).toUpperCase()};
 /* swipe left to delete, tap to edit */
 function bindSwipe(list){
   if(!list)return;
@@ -633,21 +681,21 @@ function renderReport(){
   const oneoffs=st.es.filter(e=>bucketOf(e)==='oneoff').sort((a,b)=>b.amount-a.amount);
   const bc={fixed:'var(--c-fixed)',recurring:'var(--c-rec)',oneoff:'var(--c-one)'};
   $('#body').innerHTML=`
-    <div class="donut-wrap">${donut(top,T)}<div class="leg">${top.map(([nm,v,col])=>`<div><span class="dot" style="background:${col}"></span><span>${esc(nm)}</span><span class="num muted">${pct(v,T)}</span></div>`).join('')}</div></div>
-    <div class="sec">Fixed, recurring and one-off</div>
+    <div class="card"><div class="donut-wrap">${donut(top,T)}<div class="leg">${top.map(([nm,v,col])=>`<div><span class="dot" style="background:${col}"></span><span>${esc(nm)}</span><span class="num muted">${pct(v,T)}</span></div>`).join('')}</div></div></div>
+    <div class="card"><div class="sec">Fixed, recurring and one-off</div>
     <div class="split">${['fixed','recurring','oneoff'].filter(b=>st.b[b]).map(b=>`<i style="width:${st.b[b]/T*100}%;background:${bc[b]}"></i>`).join('')}</div>
-    <div class="rows">${['fixed','recurring','oneoff'].map(b=>`<div class="r"><span class="key-l"><span class="dot" style="background:${bc[b]}"></span>${BUCKETS[b]}</span><span class="num">${inr(st.b[b])} <span class="faint">${pct(st.b[b],T)}</span></span></div>`).join('')}</div>
-    <div class="sec">Money in and out</div>
+    <div class="rows">${['fixed','recurring','oneoff'].map(b=>`<div class="r"><span class="key-l"><span class="dot" style="background:${bc[b]}"></span>${BUCKETS[b]}</span><span class="num">${inr(st.b[b])} <span class="faint">${pct(st.b[b],T)}</span></span></div>`).join('')}</div></div>
+    <div class="card"><div class="sec">Money in and out</div>
     <div class="rows">
       <div class="r"><span>Salary</span><span class="num">${inr(+st.inc.salary||0)}</span></div>
       ${(st.inc.saves||[]).map(s=>`<div class="r"><span>${esc(s.name)}</span><span class="num">−${inr(+s.amount||0)}</span></div>`).join('')}
       <div class="r"><span>Spent</span><span class="num">−${inr(T)}</span></div>
       <div class="r tot"><span>Left after savings</span><span class="num ${st.net<0?'neg':''}">${inr(st.net)}</span></div>
     </div>
-    <button class="link" id="editInc">Change salary or savings for ${esc(mLong(k))}</button>
-    <div class="sec">Food delivery</div>
-    <div class="rows"><div class="r"><span>Orders</span><span class="num">${st.deliv.n}</span></div><div class="r"><span>Total</span><span class="num">${inr(st.deliv.sum)}</span></div><div class="r"><span>Average order</span><span class="num">${st.deliv.n?inr(st.deliv.sum/st.deliv.n):'—'}</span></div></div>
-    <details class="full"><summary>Full report</summary>
+    <button class="link" id="editInc" style="padding-bottom:0">Change salary or savings for ${esc(mLong(k))}</button></div>
+    <div class="card"><div class="sec">Food delivery</div>
+    <div class="rows"><div class="r"><span>Orders</span><span class="num">${st.deliv.n}</span></div><div class="r"><span>Total</span><span class="num">${inr(st.deliv.sum)}</span></div><div class="r"><span>Average order</span><span class="num">${st.deliv.n?inr(st.deliv.sum/st.deliv.n):'—'}</span></div></div></div>
+    <details class="full card"><summary>Full report</summary>
       <h4>All categories</h4>
       <table><tr><th>Category</th><th>Entries</th><th>Amount</th><th>Share</th></tr>${cats.map(([c,v])=>`<tr><td>${esc(catName(c))}</td><td>${st.cnt[c]}</td><td>${inr(v)}</td><td>${pct(v,T)}</td></tr>`).join('')}<tr class="tot"><td>Total</td><td>${st.es.length}</td><td>${inr(T)}</td><td>100%</td></tr></table>
       <h4>Food split</h4>
@@ -674,26 +722,26 @@ function renderTrend(){
   const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
   const row=(label,f,cls='')=>`<tr class="${cls}"><td>${label}</td>${S6.map(s=>`<td>${f(s)}</td>`).join('')}</tr>`;
   $('#body').innerHTML=`
-    <div class="chart">${[1,2,3].map(i=>`<div class="gl" style="bottom:${i/4*100}%"></div>`).join('')}
+    <div class="card"><div class="chart">${[1,2,3].map(i=>`<div class="gl" style="bottom:${i/4*100}%"></div>`).join('')}
       ${S6.map((s,i)=>`<div class="bar" data-m="${last[i]}"><span class="bv num" style="bottom:${s.total/top*100}%">${(s.total/1000).toFixed(0)}k</span><i style="height:${s.b.oneoff/top*100}%;background:var(--c-one)"></i><i style="height:${s.b.recurring/top*100}%;background:var(--c-rec)"></i><i style="height:${s.b.fixed/top*100}%;background:var(--c-fixed)"></i></div>`).join('')}</div>
     <div class="xl">${last.map(m=>`<span>${esc(mShort(m))}</span>`).join('')}</div>
-    <div class="legend"><span><i class="dot" style="background:var(--c-fixed)"></i>Fixed</span><span><i class="dot" style="background:var(--c-rec)"></i>Recurring</span><span><i class="dot" style="background:var(--c-one)"></i>One-off</span></div>
-    <div class="sec">Your averages</div>
+    <div class="legend"><span><i class="dot" style="background:var(--c-fixed)"></i>Fixed</span><span><i class="dot" style="background:var(--c-rec)"></i>Recurring</span><span><i class="dot" style="background:var(--c-one)"></i>One-off</span></div></div>
+    <div class="card"><div class="sec">Your averages</div>
     <div class="rows">
       <div class="r"><span>Recurring per month</span><span class="num">${inr(avg(S6.map(s=>s.b.recurring)))}</span></div>
       <div class="r"><span>One-offs per month</span><span class="num">${inr(avg(S6.map(s=>s.b.oneoff)))}</span></div>
       <div class="r"><span>Food delivery per month</span><span class="num">${inr(avg(S6.map(s=>s.deliv.sum)))}, ${avg(S6.map(s=>s.deliv.n)).toFixed(0)} orders</span></div>
-    </div>
-    <div class="sec">Month by month</div>
-    <div style="overflow-x:auto;margin:0 -20px;padding:0 20px"><table style="min-width:${150+last.length*82}px">
+    </div></div>
+    <div class="card"><div class="sec">Month by month</div>
+    <div style="overflow-x:auto;margin:0 -16px;padding:0 16px"><table style="min-width:${150+last.length*82}px">
       <tr><th></th>${last.map(m=>`<th>${esc(mShort(m))}</th>`).join('')}</tr>
       ${row('Total spent',s=>inr(s.total))}${row('Fixed',s=>inr(s.b.fixed))}${row('Recurring',s=>inr(s.b.recurring))}${row('One-offs',s=>inr(s.b.oneoff))}
       ${row('Food, all',s=>inr(s.food))}${row('Swiggy and Zomato',s=>inr(s.deliv.sum))}${row('Office transport',s=>inr(s.officeT))}${row('Physio transport',s=>inr(s.physioT))}
       ${row('Groceries',s=>inr(s.grocery))}${row('Electricity and laundry',s=>inr(s.elecLaundry))}${row('Recharges',s=>inr(s.recharge))}
       ${row('Saved',s=>inr(s.saved))}${row('Left after savings',s=>`<span class="${s.net<0?'neg':''}">${inr(s.net)}</span>`,'tot')}
-    </table></div>
+    </table></div></div>
     <p class="muted small">Tap a bar to open that month's report.</p>`;
-  $('#body').querySelectorAll('.bar').forEach(c=>c.onclick=()=>{view.month=c.dataset.m;view.tab='report';render();scrollTo(0,0)});
+  $('#body').querySelectorAll('.bar').forEach(c=>c.onclick=()=>{view.month=c.dataset.m;view.tab='report';render();app.scrollTop=0});
 }
 
 /* ============ Salary & savings ============ */
