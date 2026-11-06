@@ -199,6 +199,8 @@ h4{font-size:14px;font-weight:600;margin:18px 0 2px}
 .res .r2 .d{flex:1;min-width:0}
 .res .r2 .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .res .r2 .c{font-size:12.5px;color:var(--graphite)}
+.res .dh2{display:flex;justify-content:space-between;font-size:12.5px;color:var(--graphite);padding:14px 0 4px;border-bottom:1px solid var(--rule)}
+.rows .r.tap{cursor:pointer}.rows .r.tap:active{opacity:.6}.rows .r.tap .chev{color:var(--faint);margin-left:4px}
 
 #dialog{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(20,24,22,.4)}
 #dialog.open{display:flex}
@@ -756,7 +758,7 @@ function renderReport(){
     <div class="card"><div class="donut-wrap">${donut(top,T)}<div class="leg">${top.map(([nm,v,col])=>`<div><span class="dot" style="background:${col}"></span><span>${esc(nm)}</span><span class="num muted">${pct(v,T)}</span></div>`).join('')}</div></div></div>
     <div class="card"><div class="sec">Fixed, recurring and one-off</div>
     <div class="split">${['fixed','recurring','oneoff'].filter(b=>st.b[b]).map(b=>`<i style="width:${st.b[b]/T*100}%;background:${bc[b]}"></i>`).join('')}</div>
-    <div class="rows">${['fixed','recurring','oneoff'].map(b=>`<div class="r"><span class="key-l"><span class="dot" style="background:${bc[b]}"></span>${BUCKETS[b]}</span><span class="num">${inr(st.b[b])} <span class="faint">${pct(st.b[b],T)}</span></span></div>`).join('')}</div></div>
+    <div class="rows">${['fixed','recurring','oneoff'].map(b=>`<div class="r tap" data-type="${b}"><span class="key-l"><span class="dot" style="background:${bc[b]}"></span>${BUCKETS[b]}</span><span class="num">${inr(st.b[b])} <span class="faint">${pct(st.b[b],T)}</span> <span class="chev">›</span></span></div>`).join('')}</div></div>
     <div class="card"><div class="sec">Money in and out</div>
     <div class="rows">
       <div class="r"><span>Salary</span><span class="num">${inr(+st.inc.salary||0)}</span></div>
@@ -784,6 +786,19 @@ function renderReport(){
       ${oneoffs.length?`<table><tr><th>Item</th><th>Date</th><th>Amount</th></tr>${oneoffs.map(e=>`<tr><td>${esc(e.desc)}</td><td>${toDate(e.date).getDate()} ${esc(mShort(k))}</td><td>${inr(e.amount)}</td></tr>`).join('')}<tr class="tot"><td>Total</td><td></td><td>${inr(st.b.oneoff)}</td></tr></table>`:'<p class="muted">No one-offs this month.</p>'}
     </details>`;
   $('#editInc').onclick=()=>pushSheet(incomeView(k));
+  $('#body').querySelectorAll('[data-type]').forEach(r=>r.onclick=()=>{tick('tap');pushSheet(typeView(k,r.dataset.type))});
+}
+/* all expenses of one type in a month */
+function typeView(k,b){
+  return {tall:true,html:()=>{
+    const st=stats(k),es=st.es.filter(e=>bucketOf(e)===b).sort((x,y)=>y.date.localeCompare(x.date)||(y.created||0)-(x.created||0));
+    const days={};es.forEach(e=>(days[e.date]=days[e.date]||[]).push(e));
+    const hint={fixed:'Rent, bills and anything you marked Fixed.',recurring:'Everyday spending, everything not marked Fixed or One-off.',oneoff:'Things you marked One-off.'}[b];
+    return `<div class="sh"><button class="ibtn left" id="cls" aria-label="Back">${ICONS.back}</button><h2>${BUCKETS[b]}, ${esc(mShort(k))}</h2><span style="width:40px"></span></div>
+    <div class="rows"><div class="r tot"><span>${es.length} expense${es.length===1?'':'s'}</span><span class="num">${inr(st.b[b],1)} <span class="faint">${pct(st.b[b],st.total)}</span></span></div></div>
+    <p class="muted small" style="margin:2px 0 6px">${hint} Tap one to edit or change its type.</p>
+    <div class="res">${es.length?Object.keys(days).map(dt=>`<div class="dh2"><span>${toDate(dt).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</span><span class="num">${inr(days[dt].reduce((s2,e)=>s2+e.amount,0),1)}</span></div>`+days[dt].map(e=>`<div class="r2" data-id="${esc(e.id)}"><div class="d"><div class="t">${esc(e.desc)}</div><div class="c"><span class="dot" style="background:${cat(e.cat).color};margin-right:6px"></span>${esc(catName(e.cat))}</div></div><div class="num" style="font-weight:500">${inr(e.amount,1)}</div></div>`).join('')).join(''):`<div class="empty">No ${BUCKETS[b].toLowerCase()} expenses in ${esc(mLong(k))}.</div>`}</div>`},
+  bind:()=>{$('#cls').onclick=popSheet;sheetEl.querySelector('.res').onclick=ev=>{const r=ev.target.closest('[data-id]');if(r)pushSheet(entryView(r.dataset.id))}}};
 }
 
 /* ============ Trend ============ */
