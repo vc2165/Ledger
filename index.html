@@ -229,6 +229,8 @@ body{touch-action:manipulation}
 #scrim{transition:opacity .3s ease}
 #toast{transition:opacity .2s,transform .25s cubic-bezier(.2,.8,.2,1)}
 /* ===== Bold card theme ===== */
+.unpaid{margin-top:12px;padding-top:10px;border-top:1px dashed #e6e2f0;display:flex;flex-wrap:wrap;gap:6px}
+.unpaid>div{width:100%}
 .big-line{font-size:24px;font-weight:600;letter-spacing:-.01em}
 html,body{background:var(--bg)}
 #app{padding:0 0 calc(116px + var(--sb))!important;background:var(--bg)}
@@ -437,10 +439,11 @@ function autoCat(desc){
 }
 const cat=id=>D.cats[resolve(id)];
 const catName=id=>cat(id).name;
-const bucketOf=e=>e.bucket||'recurring';
+const billOf=e=>{const d=e.desc.toLowerCase();return (incomeFor(monthKey(e.date)).bills||[]).find(b=>b.name&&d.includes(b.name.toLowerCase().trim()))};
+const bucketOf=e=>e.bucket||(billOf(e)?'fixed':'recurring');
 const inMonth=k=>D.entries.filter(e=>monthKey(e.date)===k);
 const monthsWithData=()=>[...new Set(D.entries.map(e=>monthKey(e.date)))].sort();
-const incomeFor=k=>D.months[k]||{salary:D.plan.salary,saves:D.plan.saves};
+const incomeFor=k=>{const m=D.months[k];return {salary:m?m.salary:D.plan.salary,saves:m?m.saves:D.plan.saves,bills:m&&m.bills?m.bills:(D.plan.bills||[])}};
 const DELIV=()=>[...new Set(['swiggy','zomato'].map(resolve))].filter(id=>id!=='other');
 function stats(k){
   const es=inMonth(k),sum=a=>a.reduce((s,e)=>s+e.amount,0),dl=DELIV();
@@ -451,7 +454,11 @@ function stats(k){
   const total=sum(es);
   const g=ids=>[...new Set(ids.map(resolve))].filter(i=>i!=='other'||ids.includes('other')).reduce((s,c)=>s+(by[c]||0),0);
   const weeks=[[1,7],[8,14],[15,21],[22,31]].map(([a,z])=>{const w=es.filter(e=>{const d=+e.date.slice(8);return d>=a&&d<=z});const r=w.filter(e=>bucketOf(e)==='recurring');return {a,z:Math.min(z,daysInMonth(k)),rec:sum(r),del:sum(r.filter(e=>dl.includes(resolve(e.cat))))}});
-  return {es,total,by,cnt,b,deliv:{n:deliv.length,sum:sum(deliv)},inc,saved,net:(+inc.salary||0)-saved-total,weeks,g,
+  // fixed bills: a bill counts from the 1st of the current month until you log it; past months use only what was logged
+  const bills=(inc.bills||[]).filter(x=>x.name).map(x=>{const nm=x.name.toLowerCase().trim();const paid=es.filter(e=>e.desc.toLowerCase().includes(nm)).reduce((s,e)=>s+e.amount,0);return {name:x.name,amount:+x.amount||0,paid}});
+  const pendingList=k>=thisMonth()?bills.filter(x=>!x.paid&&x.amount):[];
+  const pending=pendingList.reduce((s,x)=>s+x.amount,0);
+  return {es,total,by,cnt,b,deliv:{n:deliv.length,sum:sum(deliv)},inc,saved,bills,pendingList,pending,net:(+inc.salary||0)-saved-total-pending,weeks,g,
     food:g(['swiggy','zomato','lunch','eatout','snacks']),officeT:g(['t_office']),physioT:g(['t_physio']),grocery:g(['grocery']),elecLaundry:g(['electricity','laundry']),recharge:g(['recharge'])};
 }
 
@@ -603,12 +610,14 @@ function renderLog(){
       ${meter('Delivery',st.deliv.sum,B.delivery)}
       ${meter('One-offs',st.b.oneoff,B.oneoff)}
     </div>
-    <div class="netline"><span>Left after savings</span><span class="num ${st.net<0?'neg':''}" style="font-weight:600">${inr(st.net)}</span></div></div>
+    <div class="netline"><span>Left after savings${st.bills.length?' and bills':''}</span><span class="num ${st.net<0?'neg':''}" style="font-weight:600">${inr(st.net)}</span></div>
+    ${st.pendingList.length?`<div class="unpaid"><div class="muted small" style="margin-bottom:6px">Not paid yet, already counted above</div>${st.pendingList.map(x=>`<button class="chip" data-bill="${esc(x.name)}" data-amt="${x.amount}">${esc(x.name)} <span class="num">${inr(x.amount)}</span></button>`).join('')}</div>`:''}</div>
     ${(()=>{const n=notes(k,st);return n?`<div class="card notes-card">${n}</div>`:''})()}
     <div class="log">${dates.length?dates.map(dt=>{const d=toDate(dt),list=days[dt].slice().sort((a,b)=>(b.created||0)-(a.created||0));
       return `<div class="day"><div class="dh"><span>${d.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})}</span><span class="num">${inr(list.reduce((s,e)=>s+e.amount,0))}</span></div>${list.map(entryRow).join('')}</div>`}).join('')
       :`<div class="empty"><b>Nothing logged in ${esc(mLong(k))}</b>${D.entries.length?'Add an expense to start this month.':'Add your first expense, or import your Excel history from Settings.'}</div>`}</div>`;
   bindSwipe($('#body .log'));
+  $('#body').querySelectorAll('[data-bill]').forEach(b=>b.onclick=()=>pushSheet(entryView(null,null,{desc:b.dataset.bill,amt:b.dataset.amt,bucket:'fixed'})));
 }
 const initials=n=>{const w=String(n).replace(/[^A-Za-z0-9 ]/g,' ').split(' ').filter(Boolean);return (w.length>1?w[0][0]+w[1][0]:(w[0]||'?').slice(0,1)).toUpperCase()};
 /* swipe left to delete, tap to edit */
@@ -637,9 +646,9 @@ function suggestions(q){
   q=q.trim().toLowerCase();
   return Object.values(map).filter(m=>!q||(m.desc.toLowerCase().includes(q)&&m.desc.toLowerCase()!==q)).sort((a,b)=>b.n-a.n).slice(0,6);
 }
-function entryView(id,keep){
+function entryView(id,keep,pre){
   const isNew=!id,e=id?D.entries.find(x=>x.id===id):null;
-  const st={amt:e?String(e.amount):'',desc:e?(e.desc==='(unlabelled)'?'':e.desc):'',cat:e?resolve(e.cat):null,catTouched:!!e,bucket:e&&e.bucket||null,
+  const st={amt:e?String(e.amount):(pre?String(pre.amt):''),desc:e?(e.desc==='(unlabelled)'?'':e.desc):(pre?pre.desc:''),cat:e?resolve(e.cat):(pre?autoCat(pre.desc):null),catTouched:!!e,bucket:e&&e.bucket||(pre&&pre.bucket)||null,
     date:e?e.date:(keep||(view.month===thisMonth()?today():`${view.month}-01`)),more:false,allCats:false};
   const dateLabel=()=>st.date===today()?'Today':toDate(st.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:st.date.slice(0,4)===today().slice(0,4)?undefined:'numeric'});
   const catChips=()=>{
@@ -676,6 +685,7 @@ function entryView(id,keep){
     amt.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();desc.focus()}};
     desc.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();desc.blur()}};
     if(isNew&&!st.amt)setTimeout(()=>amt.focus({preventScroll:true}),40);
+    if(st.cat==='other'&&!st.catTouched)st.cat=null;
     $('#sugg').onclick=ev=>{const c=ev.target.closest('[data-d]');if(!c)return;st.desc=c.dataset.d;desc.value=st.desc;if(!st.amt){st.amt=String(+c.dataset.a);amt.value=st.amt;sizeAmt()}if(!st.catTouched)st.cat=resolve(c.dataset.c);paintCats();paintSugg();desc.blur()};
     $('#cats').onclick=ev=>{const a=ev.target.closest('[data-all]');if(a){st.allCats=!st.allCats;paintCats();return}const c=ev.target.closest('[data-c]');if(!c)return;st.cat=c.dataset.c;st.catTouched=true;paintCats()};
     $('#moreT').onclick=()=>{st.more=!st.more;rerender()};
@@ -687,7 +697,7 @@ function entryView(id,keep){
       if(!(a>0)){toast('Enter an amount');amt.focus();return null}
       const c=st.cat||(st.desc.trim()?autoCat(st.desc):'other');
       const rec={id:e?e.id:uid(),date:st.date,desc:st.desc.trim()||'(unlabelled)',amount:r2(a),cat:c,created:e&&e.created||Date.now()};
-      if(st.bucket)rec.bucket=st.bucket;
+      if(st.bucket)rec.bucket=st.bucket;else if(billOf(rec))rec.bucket='fixed';
       if(isNew)D.entries.push(rec);else D.entries=D.entries.map(x=>x.id===id?rec:x);
       save();view.month=monthKey(rec.date);render();scheduleReminder();return rec;
     };
@@ -752,9 +762,10 @@ function renderReport(){
       <div class="r"><span>Salary</span><span class="num">${inr(+st.inc.salary||0)}</span></div>
       ${(st.inc.saves||[]).map(s=>`<div class="r"><span>${esc(s.name)}</span><span class="num">−${inr(+s.amount||0)}</span></div>`).join('')}
       <div class="r"><span>Spent</span><span class="num">−${inr(T)}</span></div>
-      <div class="r tot"><span>Left after savings</span><span class="num ${st.net<0?'neg':''}">${inr(st.net)}</span></div>
+      ${st.pendingList.map(x=>`<div class="r"><span>${esc(x.name)} <span class="faint small">not paid yet</span></span><span class="num">−${inr(x.amount)}</span></div>`).join('')}
+      <div class="r tot"><span>Left after savings${st.bills.length?' and bills':''}</span><span class="num ${st.net<0?'neg':''}">${inr(st.net)}</span></div>
     </div>
-    <button class="link" id="editInc" style="padding-bottom:0">Change salary or savings for ${esc(mLong(k))}</button></div>
+    <button class="link" id="editInc" style="padding-bottom:0">Change salary, savings or bills for ${esc(mLong(k))}</button></div>
     <div class="card"><div class="sec">Food delivery</div>
     <div class="rows"><div class="r"><span>Orders</span><span class="num">${st.deliv.n}</span></div><div class="r"><span>Total</span><span class="num">${inr(st.deliv.sum)}</span></div><div class="r"><span>Average order</span><span class="num">${st.deliv.n?inr(st.deliv.sum/st.deliv.n):'—'}</span></div></div></div>
     <details class="full card"><summary>Full report</summary>
@@ -848,21 +859,28 @@ function renderTrend(){
 
 /* ============ Salary & savings ============ */
 function incomeView(k,curIn){
-  const cur=curIn||JSON.parse(JSON.stringify(k?incomeFor(k):D.plan));
+  const cur=curIn||JSON.parse(JSON.stringify(k?incomeFor(k):D.plan));cur.bills=cur.bills||[];
   return {html:()=>`
-    <div class="sh"><button class="ibtn left" id="cls" aria-label="Back">${ICONS.back}</button><h2>${k?esc(mLong(k))+' salary and savings':'Monthly plan'}</h2><span style="width:40px"></span></div>
+    <div class="sh"><button class="ibtn left" id="cls" aria-label="Back">${ICONS.back}</button><h2>${k?esc(mLong(k))+' plan':'Monthly plan'}</h2><span style="width:40px"></span></div>
     <p class="muted small" style="margin:0">${k?'Applies to this month only. Your usual numbers live in Settings, Monthly plan.':'Used for every month unless you change a particular month from its report.'}</p>
     <div class="lbl">Salary</div><input id="iSal" inputmode="numeric" value="${esc(cur.salary)}">
     <div class="lbl">Savings and investments</div>
     <div id="iSaves">${(cur.saves||[]).map((s,i)=>`<div style="display:grid;grid-template-columns:1.4fr 1fr 40px;gap:8px;margin-bottom:8px"><input data-n="${i}" value="${esc(s.name)}" placeholder="Name"><input data-a="${i}" inputmode="numeric" value="${esc(s.amount)}" placeholder="Amount"><button type="button" class="ibtn" data-rm="${i}" aria-label="Remove">${ICONS.x}</button></div>`).join('')}</div>
     <button class="link" id="iAdd">Add a saving, for example ELSS</button>
+    <div class="lbl" style="margin-top:22px">Fixed bills</div>
+    <p class="muted small" style="margin:0 0 8px">Counted from the 1st of the month until you log them. An expense whose description contains the bill's name counts as paid and is marked Fixed. Use a specific name, like "PG rent" or "Physio bill".</p>
+    <div id="iBills">${(cur.bills||[]).map((s,i)=>`<div style="display:grid;grid-template-columns:1.4fr 1fr 40px;gap:8px;margin-bottom:8px"><input data-bn="${i}" value="${esc(s.name)}" placeholder="Name"><input data-ba="${i}" inputmode="numeric" value="${esc(s.amount)}" placeholder="Amount"><button type="button" class="ibtn" data-rmb="${i}" aria-label="Remove">${ICONS.x}</button></div>`).join('')}</div>
+    <button class="link" id="iAddB">Add a bill, for example PG rent</button>
     <div class="btns">${k&&D.months[k]?'<button class="btn" id="iReset">Use monthly plan</button>':''}<button class="btn primary" id="iSave">Save</button></div>`,
   bind:()=>{
-    const read=()=>{cur.salary=+$('#iSal').value.replace(/\D/g,'')||0;cur.saves=(cur.saves||[]).map((s,i)=>({name:sheetEl.querySelector(`[data-n="${i}"]`).value.trim(),amount:+sheetEl.querySelector(`[data-a="${i}"]`).value.replace(/\D/g,'')||0}))};
+    const read=()=>{cur.salary=+$('#iSal').value.replace(/\D/g,'')||0;cur.saves=(cur.saves||[]).map((s,i)=>({name:sheetEl.querySelector(`[data-n="${i}"]`).value.trim(),amount:+sheetEl.querySelector(`[data-a="${i}"]`).value.replace(/\D/g,'')||0}));
+      cur.bills=(cur.bills||[]).map((s,i)=>({name:sheetEl.querySelector(`[data-bn="${i}"]`).value.trim(),amount:+sheetEl.querySelector(`[data-ba="${i}"]`).value.replace(/\D/g,'')||0}))};
+    $('#iAddB').onclick=()=>{read();cur.bills.push({name:'',amount:''});replaceSheet(incomeView(k,cur))};
+    $('#iBills').onclick=e=>{const b=e.target.closest('[data-rmb]');if(!b)return;read();cur.bills.splice(+b.dataset.rmb,1);replaceSheet(incomeView(k,cur))};
     $('#cls').onclick=popSheet;
     $('#iAdd').onclick=()=>{read();cur.saves.push({name:'',amount:''});replaceSheet(incomeView(k,cur))};
     $('#iSaves').onclick=e=>{const b=e.target.closest('[data-rm]');if(!b)return;read();cur.saves.splice(+b.dataset.rm,1);replaceSheet(incomeView(k,cur))};
-    $('#iSave').onclick=()=>{read();cur.saves=cur.saves.filter(s=>s.name||s.amount);if(k)D.months[k]=cur;else D.plan=cur;save();popSheet();render();toast('Saved')};
+    $('#iSave').onclick=()=>{read();cur.saves=cur.saves.filter(s=>s.name||s.amount);cur.bills=cur.bills.filter(s=>s.name);if(k)D.months[k]=cur;else D.plan=cur;save();popSheet();render();toast('Saved')};
     const r=$('#iReset');if(r)r.onclick=()=>{delete D.months[k];save();popSheet();render();toast('Using monthly plan')};
   }};
 }
@@ -1003,7 +1021,7 @@ function buildXlsx(){
   const es=[...D.entries].sort((a,b)=>a.date.localeCompare(b.date)||(a.created||0)-(b.created||0));
   const s1=[['Date','Description','Category','Amount (₹)','Type (if set)'],...es.map(e=>[{date:e.date},e.desc,catName(e.cat),e.amount,e.bucket?BUCKETS[e.bucket]:''])];
   const ms=monthsWithData(),st=ms.map(stats);
-  const s2=[['Month','Total spent','Fixed','Recurring','One-offs','Food delivery','Delivery orders','Salary','Saved / invested','Left after savings'],...ms.map((m,i)=>[mFull(m),r2(st[i].total),r2(st[i].b.fixed),r2(st[i].b.recurring),r2(st[i].b.oneoff),r2(st[i].deliv.sum),st[i].deliv.n,+st[i].inc.salary||0,st[i].saved,r2(st[i].net)])];
+  const s2=[['Month','Total spent','Fixed','Recurring','One-offs','Food delivery','Delivery orders','Salary','Saved / invested','Left after savings and bills'],...ms.map((m,i)=>[mFull(m),r2(st[i].total),r2(st[i].b.fixed),r2(st[i].b.recurring),r2(st[i].b.oneoff),r2(st[i].deliv.sum),st[i].deliv.n,+st[i].inc.salary||0,st[i].saved,r2(st[i].net)])];
   const ids=Object.keys(D.cats).filter(c=>D.entries.some(e=>resolve(e.cat)===c));
   const s3=[['Category',...ms.map(mFull)],...ids.map(c=>[D.cats[c].name,...st.map(s=>r2(s.by[c]||0))])];
   return workbook(['Expenses','Monthly summary','By category'],[s1,s2,s3],[[12,34,26,13,13],[18,13,11,12,11,13,15,11,15,17],[30,...ms.map(()=>15)]]);
@@ -1078,7 +1096,7 @@ function renderSettings(){
   const item=(id,t,s,right='<span class="chev">›</span>')=>`<div class="item" id="${id}"><div><div>${t}</div>${s?`<div class="s">${s}</div>`:''}</div>${right}</div>`;
   $('#body').innerHTML=`
     <div class="group"><h3>Money</h3>
-      ${item('sPlan','Monthly plan',`Salary ${inr(+D.plan.salary||0)}, saving ${inr(saveTot)} a month`)}
+      ${item('sPlan','Monthly plan',`Salary ${inr(+D.plan.salary||0)}, saving ${inr(saveTot)}${(D.plan.bills||[]).length?`, bills ${inr(D.plan.bills.reduce((s,x)=>s+(+x.amount||0),0))}`:''} a month`)}
       ${item('sBud','Budgets',[D.budgets.recurring&&`Recurring ${inr(D.budgets.recurring)}`,D.budgets.delivery&&`delivery ${inr(D.budgets.delivery)}`,D.budgets.oneoff&&`one-offs ${inr(D.budgets.oneoff)}`].filter(Boolean).join(', ')||'Not set')}
       ${item('sCat','Categories',`${Object.keys(D.cats).length} categories`)}
     </div>
