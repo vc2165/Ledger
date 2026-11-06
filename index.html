@@ -35,7 +35,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--green)}
 .lbl{display:block;font-size:13px;color:var(--graphite);margin:16px 0 6px;font-weight:500}
 .muted{color:var(--graphite)}.faint{color:var(--faint)}.small{font-size:13px}
 .num{font-feature-settings:'tnum';white-space:nowrap}
-.neg{color:var(--red)}.pos{color:var(--green)}
+.neg{color:var(--red)}.pos{color:var(--good)}
 .btn{border:1px solid var(--rule2);background:var(--paper);border-radius:12px;padding:12px 16px;font-weight:500;cursor:pointer;width:100%;transition:background .15s}
 .btn:active{background:var(--wash)}
 .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
@@ -208,7 +208,28 @@ h4{font-size:14px;font-weight:600;margin:18px 0 2px}
 #toast.show{opacity:1;transform:translateX(-50%)}
 #toast button{background:none;border:0;color:#9fd8bf;font-weight:600;cursor:pointer;padding:0;pointer-events:auto}
 .lock{min-height:80dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
+/* ===== Motion & touch ===== */
+body{touch-action:manipulation}
+#body{will-change:transform,opacity}
+#body.in-r{animation:inR .26s cubic-bezier(.2,.8,.2,1)}
+#body.in-l{animation:inL .26s cubic-bezier(.2,.8,.2,1)}
+#body.in-f{animation:inF .2s ease-out}
+@keyframes inR{from{opacity:0;transform:translate3d(28px,0,0)}to{opacity:1;transform:none}}
+@keyframes inL{from{opacity:0;transform:translate3d(-28px,0,0)}to{opacity:1;transform:none}}
+@keyframes inF{from{opacity:0}to{opacity:1}}
+.ent .fg,.item,.chip,.btn,.ibtn,.tab svg,.fab,.key-l,.bar,.r2,.link{transition:background-color .12s,transform .12s,opacity .12s}
+.ent .fg:active{background:#f6f3fd}
+.item:active,.r2:active{background:#f6f3fd}
+.chip:active,.btn:active,.fab:active{transform:scale(.97)}
+.ibtn:active{transform:scale(.92)}
+.tab:active svg{transform:scale(.9)}
+.bar:active{opacity:.75}
+#sheet{transition:transform .34s cubic-bezier(.32,.72,0,1)!important;will-change:transform}
+#overlay.closing #sheet{transition:transform .22s cubic-bezier(.4,0,1,1)!important}
+#scrim{transition:opacity .3s ease}
+#toast{transition:opacity .2s,transform .25s cubic-bezier(.2,.8,.2,1)}
 /* ===== Bold card theme ===== */
+.big-line{font-size:24px;font-weight:600;letter-spacing:-.01em}
 html,body{background:var(--bg)}
 #app{padding:0 0 calc(116px + var(--sb))!important;background:var(--bg)}
 .band{background:linear-gradient(160deg,var(--deep) 0%,#5b2fc4 72%,#6a3fd6 100%);color:#fff;padding:calc(var(--st) + 14px) max(20px,calc(50% - 300px)) 22px;border-radius:0 0 26px 26px;margin-bottom:16px}
@@ -401,7 +422,7 @@ function migrate(){
   Object.values(D.cats).forEach(c=>delete c.bucket);
   D.ver=3;
 }
-let S={lock:false,remind:{on:false,hour:21,minute:30}};
+let S={lock:false,haptic:true,remind:{on:false,hour:21,minute:30}};
 try{const s=JSON.parse(localStorage.getItem(SETTINGS)||'{}');Object.assign(S,s,{remind:Object.assign({},S.remind,s.remind||{})})}catch(e){}
 const save=()=>localStorage.setItem(STORE,JSON.stringify(D));
 const saveS=()=>localStorage.setItem(SETTINGS,JSON.stringify(S));
@@ -445,10 +466,13 @@ function closeAll(){const n=stack.length+(dlg?1:0);if(dlg){const d=dlg;dlg=null;
 addEventListener('popstate',()=>{if(skipPop){skipPop--;return}if(dlg){const d=dlg;dlg=null;$('#dialog').classList.remove('open');d(null);return}if(stack.length){stack.pop();stack.length?renderTop():hideOverlay();return}onRootBack()});
 $('#scrim').onclick=()=>closeAll();
 let drag=null;
-sheetEl.addEventListener('touchstart',e=>{drag=sheetEl.scrollTop<=0&&!e.target.closest('.chips')?{y:e.touches[0].clientY,dy:0,on:false}:null},{passive:true});
-sheetEl.addEventListener('touchmove',e=>{if(!drag)return;const dy=e.touches[0].clientY-drag.y;if(!drag.on){if(dy>10&&!['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName))drag.on=true;else if(Math.abs(dy)>10){drag=null;return}}if(drag.on){e.preventDefault();drag.dy=Math.max(0,dy);sheetEl.style.transition='none';sheetEl.style.transform=`translateY(${drag.dy}px)`}},{passive:false});
-sheetEl.addEventListener('touchend',()=>{if(!drag)return;const d=drag;drag=null;sheetEl.style.transition='';sheetEl.style.transform='';if(d.on&&d.dy>110)closeAll()});
-document.addEventListener('focusin',e=>{if(e.target.matches('input,textarea,select')&&sheetEl.contains(e.target))setTimeout(()=>e.target.scrollIntoView({block:'center',behavior:'smooth'}),300)});
+sheetEl.addEventListener('touchstart',e=>{drag=sheetEl.scrollTop<=0&&!e.target.closest('.chips')?{y:e.touches[0].clientY,dy:0,on:false,t:performance.now(),v:0,ly:e.touches[0].clientY,lt:performance.now()}:null},{passive:true});
+sheetEl.addEventListener('touchmove',e=>{if(!drag)return;const y=e.touches[0].clientY,dy=y-drag.y,now=performance.now();
+  if(!drag.on){if(dy>8&&!['INPUT','TEXTAREA','SELECT'].includes((document.activeElement||{}).tagName))drag.on=true;else if(Math.abs(dy)>8){drag=null;return}}
+  if(drag.on){e.preventDefault();drag.v=(y-drag.ly)/Math.max(1,now-drag.lt);drag.ly=y;drag.lt=now;drag.dy=Math.max(0,dy);
+    sheetEl.style.transition='none';sheetEl.style.transform=`translate3d(0,${drag.dy}px,0)`;$('#scrim').style.opacity=String(Math.max(0,1-drag.dy/(sheetEl.offsetHeight||600)))}},{passive:false});
+sheetEl.addEventListener('touchend',()=>{if(!drag)return;const d=drag;drag=null;sheetEl.style.transition='';sheetEl.style.transform='';$('#scrim').style.opacity='';if(d.on&&(d.dy>110||d.v>0.6))closeAll()});
+document.addEventListener('focusin',e=>{if(e.target.matches('input,textarea,select')&&e.target.id!=='amt'&&sheetEl.contains(e.target))setTimeout(()=>e.target.scrollIntoView({block:'center',behavior:'smooth'}),300)});
 function dialog({title,message='',input=null,placeholder='',ok='OK',cancel='Cancel',danger=false}){
   return new Promise(res=>{
     const el=$('#dialog');
@@ -463,7 +487,7 @@ function dialog({title,message='',input=null,placeholder='',ok='OK',cancel='Canc
 /* ============ Fingerprint lock (optional) ============ */
 let unlocked=!(S.lock&&NATIVE),hiddenAt=0,busy=false,picking=false;
 async function unlock(){if(busy)return;busy=true;try{await nat('NativeBiometric','verifyIdentity',{title:'Unlock Ledger',negativeButtonText:'Cancel',useFallback:true});unlocked=true;render()}catch(e){}finally{busy=false}}
-function renderLock(){app.innerHTML=`<div class="lock"><div class="title">Ledger</div><p class="muted" style="margin:0">Locked</p><button class="btn primary" style="max-width:240px" id="unl">Unlock</button></div>`;$('#unl').onclick=unlock;setTimeout(unlock,250)}
+function renderLock(){shell=false;app.innerHTML=`<div class="lock"><div class="title">Ledger</div><p class="muted" style="margin:0">Locked</p><button class="btn primary" style="max-width:240px" id="unl">Unlock</button></div>`;$('#unl').onclick=unlock;setTimeout(unlock,250)}
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){hiddenAt=Date.now();return}
   if(S.lock&&NATIVE&&!busy&&!picking&&Date.now()-hiddenAt>60000){unlocked=false;closeAll();renderLock();return}
@@ -497,38 +521,58 @@ function guard(){if(atRoot){clearTimeout(rootT);atRoot=false;history.pushState({
 function goTab(t){
   if(t===view.tab)return;
   guard();
+  const dir=TAB_ORDER.indexOf(t)>TAB_ORDER.indexOf(view.tab)?'r':'l';
   if(view.tab==='log')history.pushState({tab:t},'');
   else if(t==='log'){history.back();return}   // popstate brings us home
   else history.replaceState({tab:t},'');
-  view.tab=t;render();app.scrollTop=0;
+  view.tab=t;app.scrollTop=0;render(dir);
 }
 function onRootBack(){
-  if(view.tab!=='log'){view.tab='log';render();app.scrollTop=0;return}
+  if(view.tab!=='log'){view.tab='log';app.scrollTop=0;render('l');return}
   atRoot=true;toast('Press back again to exit');
   clearTimeout(rootT);rootT=setTimeout(()=>{if(atRoot&&!stack.length){atRoot=false;history.pushState({home:1},'')}},2000);
 }
 history.replaceState({root:1},'');history.pushState({home:1},'');
 
+const tick=kind=>{if(NATIVE&&S.haptic)nat('Tick','tick',{kind}).catch(()=>{})};
 /* ============ Shell ============ */
 const view={tab:'log',month:thisMonth()};
 const TABS=[['log','Ledger','<path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/>'],['report','Report','<circle cx="12" cy="12" r="8"/><path d="M12 4v8l6 4"/>'],['trend','Trend','<path d="M4 20h16M7 16v-5M12 16V7M17 16v-8"/>'],['settings','Settings','<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/>']];
-function render(){
-  if(!unlocked)return renderLock();
+let shell=false,lastTotal=null;
+const TAB_ORDER=['log','report','trend','settings'];
+function buildShell(){
+  app.innerHTML=`<div class="band" id="band"></div><div id="body"></div>
+    <button class="fab" id="add">${ICONS.plus}Add expense</button>
+    <nav class="tabs"><div class="in">${TABS.map(([id,t,p])=>`<button class="tab" data-tab="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>${t}</button>`).join('')}</div></nav>`;
+  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
+  $('#add').onclick=()=>pushSheet(entryView());
+  shell=true;
+}
+function countUp(el,from,to){
+  if(from===null||from===to||matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=inr(to);return}
+  const t0=performance.now(),dur=380;
+  const step=t=>{const k=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-k,3);el.textContent=inr(from+(to-from)*e);if(k<1&&el.isConnected)requestAnimationFrame(step)};
+  requestAnimationFrame(step);
+}
+function render(dir){
+  if(!unlocked){shell=false;return renderLock()}
+  if(!shell)buildShell();
   const month=view.tab==='log'||view.tab==='report';
   const title={log:mLong(view.month),report:mLong(view.month),trend:'Trend',settings:'Settings'}[view.tab];
   const sub=month?view.month.slice(0,4):view.tab==='trend'?'Month by month':'';
   const isLog=view.tab==='log',lst=isLog?stats(view.month):null;
-  app.innerHTML=`<div class="band ${isLog?'tall':''}"><div class="band-top"><div class="title">${esc(title)}${sub?`<small>${esc(sub)}</small>`:''}</div>
+  const band=$('#band');band.className='band'+(isLog?' tall':'');
+  band.innerHTML=`<div class="band-top"><div class="title">${esc(title)}${sub?`<small>${esc(sub)}</small>`:''}</div>
     <div class="hbtns">${month?`<button class="ibtn" id="mPrev" aria-label="Previous month">${ICONS.prev}</button><button class="ibtn" id="mNext" aria-label="Next month">${ICONS.next}</button>`:''}${isLog?`<button class="ibtn" id="srch" aria-label="Search">${ICONS.search}</button>`:''}</div></div>
-    ${isLog?`<div class="b-sp">Spent this month</div><div class="b-v num">${inr(lst.total)}</div>`:''}</div>
-    <div id="body" class="${isLog?'float':''}"></div>
-    ${view.tab==='log'?`<button class="fab" id="add">${ICONS.plus}Add expense</button>`:''}
-    <nav class="tabs"><div class="in">${TABS.map(([id,t,p])=>`<button class="tab ${view.tab===id?'on':''}" data-tab="${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>${t}</button>`).join('')}</div></nav>`;
-  app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
-  if(month){$('#mPrev').onclick=()=>{view.month=addMonth(view.month,-1);render()};$('#mNext').onclick=()=>{view.month=addMonth(view.month,1);render()}}
+    ${isLog?`<div class="b-sp">Spent this month</div><div class="b-v num" id="bTot"></div>`:''}`;
+  if(isLog){countUp($('#bTot'),dir==='l'||dir==='r'?lastTotal:null,lst.total);lastTotal=lst.total}
+  app.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===view.tab));
+  $('#add').hidden=!isLog;
+  const body=$('#body');body.className=isLog?'float':'';
+  if(month){$('#mPrev').onclick=()=>{view.month=addMonth(view.month,-1);render('l')};$('#mNext').onclick=()=>{view.month=addMonth(view.month,1);render('r')}}
   const s=$('#srch');if(s)s.onclick=()=>pushSheet(searchView());
-  const a=$('#add');if(a)a.onclick=()=>pushSheet(entryView());
   ({log:renderLog,report:renderReport,trend:renderTrend,settings:renderSettings})[view.tab]();
+  if(dir){void body.offsetWidth;body.classList.add(dir==='r'?'in-r':dir==='l'?'in-l':'in-f')}
 }
 
 /* ============ Ledger (log) ============ */
@@ -581,7 +625,7 @@ function bindSwipe(list){
 }
 function removeEntry(id){
   const i=D.entries.findIndex(x=>x.id===id);if(i<0)return;
-  const [e]=D.entries.splice(i,1);save();render();scheduleReminder();
+  const [e]=D.entries.splice(i,1);tick('tap');save();render();scheduleReminder();
   toast(`Deleted ${e.desc}`,'Undo',()=>{D.entries.push(e);save();render();scheduleReminder()});
 }
 
@@ -631,7 +675,7 @@ function entryView(id,keep){
     amt.oninput=()=>{let v=amt.value.replace(/[^\d.]/g,'');const p=v.split('.');if(p.length>2)v=p[0]+'.'+p.slice(1).join('');const q=v.split('.');if(q[1]&&q[1].length>2)v=q[0]+'.'+q[1].slice(0,2);amt.value=v;st.amt=v;sizeAmt()};
     amt.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();desc.focus()}};
     desc.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();desc.blur()}};
-    if(isNew&&!st.amt)setTimeout(()=>amt.focus(),330);
+    if(isNew&&!st.amt)setTimeout(()=>amt.focus({preventScroll:true}),40);
     $('#sugg').onclick=ev=>{const c=ev.target.closest('[data-d]');if(!c)return;st.desc=c.dataset.d;desc.value=st.desc;if(!st.amt){st.amt=String(+c.dataset.a);amt.value=st.amt;sizeAmt()}if(!st.catTouched)st.cat=resolve(c.dataset.c);paintCats();paintSugg();desc.blur()};
     $('#cats').onclick=ev=>{const a=ev.target.closest('[data-all]');if(a){st.allCats=!st.allCats;paintCats();return}const c=ev.target.closest('[data-c]');if(!c)return;st.cat=c.dataset.c;st.catTouched=true;paintCats()};
     $('#moreT').onclick=()=>{st.more=!st.more;rerender()};
@@ -647,8 +691,8 @@ function entryView(id,keep){
       if(isNew)D.entries.push(rec);else D.entries=D.entries.map(x=>x.id===id?rec:x);
       save();view.month=monthKey(rec.date);render();scheduleReminder();return rec;
     };
-    $('#save').onclick=()=>{const r=commit();if(r){popSheet();toast(isNew?`Saved ${inr(r.amount,1)}`:'Changes saved')}};
-    const nx=$('#next');if(nx)nx.onclick=()=>{const r=commit();if(r){view_=entryView(null,r.date);replaceSheet(view_);toast(`Saved ${inr(r.amount,1)}`)}};
+    $('#save').onclick=()=>{const r=commit();if(r){tick('confirm');popSheet();toast(isNew?`Saved ${inr(r.amount,1)}`:'Changes saved')}};
+    const nx=$('#next');if(nx)nx.onclick=()=>{const r=commit();if(r){tick('confirm');view_=entryView(null,r.date);replaceSheet(view_);toast(`Saved ${inr(r.amount,1)}`)}};
     const dl=$('#del');if(dl)dl.onclick=()=>{popSheet();setTimeout(()=>removeEntry(id),250)};
   }};
 }
@@ -732,18 +776,58 @@ function renderReport(){
 }
 
 /* ============ Trend ============ */
+function recBy(st){const o={};st.es.forEach(e=>{if(bucketOf(e)==='recurring'){const c=resolve(e.cat);o[c]=(o[c]||0)+e.amount}});return o}
 function renderTrend(){
   const ms=monthsWithData();
   if(!ms.length){$('#body').innerHTML='<div class="empty"><b>No history yet</b>Add or import expenses to see month-by-month trends.</div>';return}
-  const last=ms.slice(-6),S6=last.map(stats),max=Math.max(...S6.map(s=>s.total),1);
-  const step=max>80000?20000:max>40000?10000:5000,top=Math.ceil(max/step)*step;
-  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const last=ms.slice(-6),S6=last.map(stats);
+  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+  const cur=thisMonth(),past=last.filter(m=>m!==cur),PS=past.map(stats),PR=PS.map(recBy);
+  const mlink=m=>`<button class="link" data-m="${m}" style="padding:0">${esc(mLong(m))}</button>`;
   const row=(label,f,cls='')=>`<tr class="${cls}"><td>${label}</td>${S6.map(s=>`<td>${f(s)}</td>`).join('')}</tr>`;
+  // 1. this month against your average
+  let vsHTML='';
+  const avgRec=avg(PS.map(s=>s.b.recurring));
+  if(ms.includes(cur)&&PS.length){
+    const sc=stats(cur),d=new Date().getDate(),N=daysInMonth(cur);
+    if(d>=5){const p=sc.b.recurring/d*N,diff=p-avgRec;
+      vsHTML=`<div class="big-line num ${diff>0?'neg':'pos'}">${diff>0?'▲':'▼'} ${inr(Math.abs(diff))}</div><p class="muted" style="margin:2px 0 0">${esc(mLong(cur))} is heading for <b class="num">${inr(p)}</b> in recurring spending, ${diff>0?'above':'below'} your average of <span class="num">${inr(avgRec)}</span> over the last ${PS.length} month${PS.length>1?'s':''}.</p>`}
+    else vsHTML=`<p class="muted" style="margin:0">It's early in ${esc(mLong(cur))}. From the 5th, this shows how the month compares with your average of <span class="num">${inr(avgRec)}</span>.</p>`;
+  }else if(PS.length>=2){
+    const lm=past[past.length-1],ls=PS[PS.length-1],o=avg(PS.slice(0,-1).map(s=>s.b.recurring)),diff=ls.b.recurring-o;
+    vsHTML=`<div class="big-line num ${diff>0?'neg':'pos'}">${diff>0?'▲':'▼'} ${inr(Math.abs(diff))}</div><p class="muted" style="margin:2px 0 0">${esc(mLong(lm))} recurring was <b class="num">${inr(ls.b.recurring)}</b>, ${diff>0?'above':'below'} your earlier average of <span class="num">${inr(o)}</span>.</p>`;
+  }else vsHTML='<p class="muted" style="margin:0">Needs at least two months of history.</p>';
+  // 2. best and worst months, and what drove the worst one
+  let bwHTML='<p class="muted" style="margin:0">Needs at least two months of history.</p>';
+  if(PS.length>=2){
+    const idx=PS.map((s,i)=>i).sort((x,y)=>PS[x].b.recurring-PS[y].b.recurring),lo=idx[0],hi=idx[idx.length-1];
+    const others=PR.filter((_,i)=>i!==hi);let drv=null,drvUp=0;
+    Object.keys(PR[hi]).forEach(c=>{const up=PR[hi][c]-avg(others.map(o=>o[c]||0));if(up>drvUp){drvUp=up;drv=c}});
+    bwHTML=`<div class="rows">
+      <div class="r"><span>Lowest: ${mlink(past[lo])}</span><span class="num pos">${inr(PS[lo].b.recurring)}</span></div>
+      <div class="r"><span>Highest: ${mlink(past[hi])}</span><span class="num neg">${inr(PS[hi].b.recurring)}</span></div></div>
+      ${drv?`<p class="muted small" style="margin:8px 0 0">${esc(mLong(past[hi]))} was mostly pushed up by <b>${esc(catName(drv))}</b>, <span class="num">${inr(drvUp)}</span> more than its usual month.</p>`:''}`;
+  }
+  // 3. categories that keep rising or falling
+  let chHTML='<p class="muted" style="margin:0">Needs at least three months of history.</p>';
+  if(PR.length>=3){
+    const L=PR.slice(-3),names=past.slice(-3).map(mShort);
+    const cats=[...new Set(L.flatMap(o=>Object.keys(o)))];
+    const up=[],down=[];
+    cats.forEach(c=>{const v=L.map(o=>o[c]||0);
+      if(v[0]<v[1]&&v[1]<v[2]&&v[2]-v[0]>=300)up.push([c,v]);
+      if(v[0]>v[1]&&v[1]>v[2]&&v[0]-v[2]>=300)down.push([c,v]);});
+    up.sort((x,y)=>(y[1][2]-y[1][0])-(x[1][2]-x[1][0]));down.sort((x,y)=>(x[1][2]-x[1][0])-(y[1][2]-y[1][0]));
+    const li=([c,v],cls)=>`<div class="r"><span>${esc(catName(c))}</span><span class="num small">${v.map(x=>inr(x)).join(' → ')} <b class="${cls}">${cls==='neg'?'▲':'▼'}</b></span></div>`;
+    chHTML=`<p class="muted small" style="margin:0 0 6px">Your last three months: ${names.join(', ')}</p>
+      ${up.length?`<h4 style="margin:6px 0 0">Rising every month</h4><div class="rows">${up.slice(0,4).map(x=>li(x,'neg')).join('')}</div>`:''}
+      ${down.length?`<h4 style="margin:10px 0 0">Falling every month</h4><div class="rows">${down.slice(0,4).map(x=>li(x,'pos')).join('')}</div>`:''}
+      ${!up.length&&!down.length?'<p class="muted" style="margin:0">No category has gone steadily up or down over these three months.</p>':''}`;
+  }
   $('#body').innerHTML=`
-    <div class="card"><div class="chart">${[1,2,3].map(i=>`<div class="gl" style="bottom:${i/4*100}%"></div>`).join('')}
-      ${S6.map((s,i)=>`<div class="bar" data-m="${last[i]}"><span class="bv num" style="bottom:${s.total/top*100}%">${(s.total/1000).toFixed(0)}k</span><i style="height:${s.b.oneoff/top*100}%;background:var(--c-one)"></i><i style="height:${s.b.recurring/top*100}%;background:var(--c-rec)"></i><i style="height:${s.b.fixed/top*100}%;background:var(--c-fixed)"></i></div>`).join('')}</div>
-    <div class="xl">${last.map(m=>`<span>${esc(mShort(m))}</span>`).join('')}</div>
-    <div class="legend"><span><i class="dot" style="background:var(--c-fixed)"></i>Fixed</span><span><i class="dot" style="background:var(--c-rec)"></i>Recurring</span><span><i class="dot" style="background:var(--c-one)"></i>One-off</span></div></div>
+    <div class="card"><div class="sec">This month against your average</div>${vsHTML}</div>
+    <div class="card"><div class="sec">Best and worst months</div>${bwHTML}</div>
+    <div class="card"><div class="sec">Changes to watch</div>${chHTML}</div>
     <div class="card"><div class="sec">Your averages</div>
     <div class="rows">
       <div class="r"><span>Recurring per month</span><span class="num">${inr(avg(S6.map(s=>s.b.recurring)))}</span></div>
@@ -752,14 +836,14 @@ function renderTrend(){
     </div></div>
     <div class="card"><div class="sec">Month by month</div>
     <div style="overflow-x:auto;margin:0 -16px;padding:0 16px"><table style="min-width:${150+last.length*82}px">
-      <tr><th></th>${last.map(m=>`<th>${esc(mShort(m))}</th>`).join('')}</tr>
+      <tr><th></th>${last.map(m=>`<th><button class="link" data-m="${m}" style="padding:0;font-weight:600">${esc(mShort(m))}</button></th>`).join('')}</tr>
       ${row('Total spent',s=>inr(s.total))}${row('Fixed',s=>inr(s.b.fixed))}${row('Recurring',s=>inr(s.b.recurring))}${row('One-offs',s=>inr(s.b.oneoff))}
       ${row('Food, all',s=>inr(s.food))}${row('Swiggy and Zomato',s=>inr(s.deliv.sum))}${row('Office transport',s=>inr(s.officeT))}${row('Physio transport',s=>inr(s.physioT))}
       ${row('Groceries',s=>inr(s.grocery))}${row('Electricity and laundry',s=>inr(s.elecLaundry))}${row('Recharges',s=>inr(s.recharge))}
       ${row('Saved',s=>inr(s.saved))}${row('Left after savings',s=>`<span class="${s.net<0?'neg':''}">${inr(s.net)}</span>`,'tot')}
     </table></div></div>
-    <p class="muted small">Tap a bar to open that month's report.</p>`;
-  $('#body').querySelectorAll('.bar').forEach(c=>c.onclick=()=>{view.month=c.dataset.m;goTab('report')});
+    <p class="muted small">Tap a month name to open its report.</p>`;
+  $('#body').querySelectorAll('[data-m]').forEach(c=>c.onclick=()=>{view.month=c.dataset.m;goTab('report')});
 }
 
 /* ============ Salary & savings ============ */
@@ -1007,6 +1091,7 @@ function renderSettings(){
       ${item('sBak','Save a backup','A file you can keep in Google Drive')}
       ${item('sRes','Restore a backup','Replaces everything in Ledger')}
     </div>
+    ${NATIVE?`<div class="group"><h3>Feel</h3>${item('sHap','Vibration','A light tick when you save or delete',`<button class="switch ${S.haptic?'on':''}" aria-label="Vibration"></button>`)}</div>`:''}
     ${NATIVE?`<div class="group"><h3>Privacy</h3>${item('sLock','Fingerprint lock','Ask for your fingerprint when Ledger opens',`<button class="switch ${S.lock?'on':''}" aria-label="Fingerprint lock"></button>`)}</div>`:''}
     <div class="group"><h3>Danger zone</h3>${item('sWipe','<span class="neg">Erase all data</span>','Removes every expense, category change, budget and plan')}</div>
     <p class="muted small">Ledger stores everything on this phone and never connects to the internet. Auto-categories follow the rules from your monthly reports, plus any words you add to a category.</p>`;
@@ -1018,6 +1103,7 @@ function renderSettings(){
   on('sRes',async()=>{const j=await pickJSON();if(!j)return;if(j.app!=='ledger'||!j.data){toast('That file is not a Ledger backup');return}
     if(!await dialog({title:'Restore this backup?',message:`It contains ${j.data.entries.length} expenses. Everything in Ledger now will be replaced.`,ok:'Restore',danger:true}))return;
     D=j.data;migrate();save();view.month=monthsWithData().slice(-1)[0]||thisMonth();render();toast('Backup restored')});
+  on('sHap',()=>{S.haptic=!S.haptic;saveS();renderSettings();if(S.haptic)tick('confirm')});
   on('sLock',async()=>{
     if(S.lock){S.lock=false;saveS();renderSettings();toast('Fingerprint lock off');return}
     try{const r=await nat('NativeBiometric','isAvailable',{useFallback:true});if(!r.isAvailable){toast('Set up a fingerprint or screen lock first');return}
