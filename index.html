@@ -1045,7 +1045,7 @@ function buildXlsx(){
 function buildMonthXlsx(k){
   const st=stats(k),T=st.total;
   const es=[...st.es].sort((a,b)=>a.date.localeCompare(b.date)||(a.created||0)-(b.created||0));
-  const sum=[['Item','Amount (₹)'],['Salary',+st.inc.salary||0],...(st.inc.saves||[]).map(x=>[x.name,+x.amount||0]),['Total saved / invested',st.saved],['Total spent',r2(T)],['Left after savings',r2(st.net)],['',''],
+  const sum=[['Item','Amount (₹)'],['Salary',+st.inc.salary||0],...(st.inc.saves||[]).map(x=>[x.name,+x.amount||0]),['Total saved / invested',st.saved],['Total spent',r2(T)],...st.pendingList.map(x=>[`${x.name} (bill, not paid yet)`,+x.amount||0]),[st.bills.length?'Left after savings and bills':'Left after savings',r2(st.net)],['',''],
     ['Fixed',r2(st.b.fixed)],['Recurring',r2(st.b.recurring)],['One-offs',r2(st.b.oneoff)],['',''],['Food delivery orders',st.deliv.n],['Food delivery total',r2(st.deliv.sum)],['Average order',st.deliv.n?r2(st.deliv.sum/st.deliv.n):0]];
   const exp=[['Date','Description','Category','Amount (₹)','Type (if set)'],...es.map(e=>[{date:e.date},e.desc,catName(e.cat),e.amount,e.bucket?BUCKETS[e.bucket]:''])];
   const cats=Object.entries(st.by).sort((a,b)=>b[1]-a[1]);
