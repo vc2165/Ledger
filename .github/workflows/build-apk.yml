@@ -69,43 +69,7 @@ jobs:
           public class MainActivity extends BridgeActivity {
               @Override
               public void onCreate(Bundle savedInstanceState) {
+                  registerPlugin(TickPlugin.class);
                   super.onCreate(savedInstanceState);
                   // No stretch/bounce when pulling past the top or bottom, so the tab bar never moves
-                  getBridge().getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
-              }
-          }
-          EOF
-          cat > android/app/src/main/res/drawable/ic_stat_ledger.xml <<'EOF'
-          <vector xmlns:android="http://schemas.android.com/apk/res/android"
-              android:width="24dp" android:height="24dp"
-              android:viewportWidth="24" android:viewportHeight="24">
-              <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
-                  android:pathData="M6,3h12a1,1 0,0 1,1 1v17l-2.3,-1.4 -2.3,1.4 -2.4,-1.4 -2.4,1.4 -2.3,-1.4L5,21V4a1,1 0,0 1,1 -1zM8,7v2h8V7H8zM8,11v2h8v-2H8zM8,15v2h5v-2H8z"/>
-          </vector>
-          EOF
-          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
-          grep -n "versionCode\|versionName" android/app/build.gradle
-
-      - name: Build APK
-        working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
-
-      - name: Sign APK
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          echo "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > release.p12
-          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
-          "$BT/zipalign" -p -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-          "$BT/apksigner" sign --ks release.p12 --ks-type PKCS12 --ks-pass pass:cardvault-sign --ks-key-alias cardvault --out Ledger.apk aligned.apk
-          "$BT/apksigner" verify Ledger.apk
-          rm release.p12
-
-      - name: Publish APK to Releases
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.${{ github.run_number }}
-          name: Ledger 1.${{ github.run_number }}
-          body: Download **Ledger.apk** below and open it on your phone to install or update.
-          files: Ledger.apk
-          make_latest: true
+                  getBridge().getWebView().setOverScrollMode(Vi
